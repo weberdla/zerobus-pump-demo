@@ -163,9 +163,13 @@ export default function App() {
         </div>
       </nav>
 
-      <AlarmPanel alarms={shown.alarms} idle={idle} waiting={waiting} />
-      {error && <div className="banner error">Connection lost ({error}). Showing the last values received.</div>}
-      {state.message && <div className="banner info">{state.message}</div>}
+      <AlarmPanel
+        alarms={shown.alarms}
+        idle={idle}
+        waiting={waiting}
+        error={error && `Connection lost (${error}). Showing the last values received.`}
+        message={state.message}
+      />
 
       <main className={`tab-body tab-${tab}`} role="tabpanel">
         {tab === "pump" && (
