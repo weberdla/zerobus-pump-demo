@@ -1,0 +1,69 @@
+resources:
+  jobs:
+    # Runs the silver pipeline in continuous mode. Deployed paused so nothing runs (or bills)
+    # between demos; the demo job unpauses it at the start and pauses it again at the end.
+    zerobus_pump_silver_live:
+      name: zerobus_pump_silver_live
+      description: Keeps the silver pipeline running continuously during a demo. Normally paused.
+      continuous:
+        pause_status: PAUSED
+      tasks:
+        - task_key: silver_pipeline
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.zerobus_pump_silver.id}
+
+    zerobus_pump_demo:
+      name: zerobus_pump_demo
+      description: >-
+        End-to-end Zerobus Ingest demo: creates the bronze table, starts the live silver pipeline,
+        streams simulated pump tags through Zerobus Ingest, then stops the pipeline.
+      timeout_seconds: 7200
+      parameters:
+        - name: demo_minutes
+          default: ${var.demo_minutes}
+        - name: fault
+          default: ${var.fault}
+      tasks:
+        - task_key: create_bronze
+          notebook_task:
+            notebook_path: ../solution/create_bronze.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${resources.schemas.zerobus_pump_schema.name}
+              sp_application_id: ${var.sp_application_id}
+              app_name: ${var.app_name}
+
+        - task_key: start_live_silver
+          depends_on:
+            - task_key: create_bronze
+          notebook_task:
+            notebook_path: ../solution/silver_live_control.py
+            base_parameters:
+              action: start
+              live_job_id: ${resources.jobs.zerobus_pump_silver_live.id}
+              pipeline_id: ${resources.pipelines.zerobus_pump_silver.id}
+
+        - task_key: stream_pump_data
+          depends_on:
+            - task_key: create_bronze
+          notebook_task:
+            notebook_path: ../solution/stream_pump_data.py
+            base_parameters:
+              server_endpoint: ${var.zerobus_endpoint}
+              table_name: ${var.catalog}.${resources.schemas.zerobus_pump_schema.name}.pump_tags_bronze
+              secret_scope: ${var.secret_scope}
+              duration_minutes: "{{job.parameters.demo_minutes}}"
+              fault: "{{job.parameters.fault}}"
+
+        # Runs even if streaming fails, so the live pipeline never keeps running unattended.
+        - task_key: stop_live_silver
+          depends_on:
+            - task_key: start_live_silver
+            - task_key: stream_pump_data
+          run_if: ALL_DONE
+          notebook_task:
+            notebook_path: ../solution/silver_live_control.py
+            base_parameters:
+              action: stop
+              live_job_id: ${resources.jobs.zerobus_pump_silver_live.id}
+              pipeline_id: ${resources.pipelines.zerobus_pump_silver.id}

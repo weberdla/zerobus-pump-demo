@@ -1,0 +1,17 @@
+{
+  "name": "zerobus-pump-hmi",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Plant-style live display for the Zerobus pump demo",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^6.1.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "vite": "^8.3.5"
+  }
+}

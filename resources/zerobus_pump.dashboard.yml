@@ -1,0 +1,9 @@
+resources:
+  dashboards:
+    zerobus_pump_dashboard:
+      display_name: Zerobus Pump Live Demo
+      file_path: ../solution/zerobus_pump.lvdash.json
+      warehouse_id: ${var.warehouse_id}
+      # Dataset queries use unqualified table names, resolved against the demo schema.
+      dataset_catalog: ${var.catalog}
+      dataset_schema: ${resources.schemas.zerobus_pump_schema.name}

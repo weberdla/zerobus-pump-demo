@@ -1,0 +1,28 @@
+resources:
+  apps:
+    # Plant-style live display of PUMP-101 with demo controls (solution/hmi_app).
+    zerobus_pump_hmi:
+      name: ${var.app_name}
+      description: Live operator screen for PUMP-101 - silver current state, bronze trends, alarms, demo controls
+      source_code_path: ../solution/hmi_app
+      config:
+        command: ["python", "app.py"]
+        env:
+          - name: PUMP_CATALOG
+            value: ${var.catalog}
+          - name: PUMP_SCHEMA
+            value: ${resources.schemas.zerobus_pump_schema.name}
+          - name: WAREHOUSE_ID
+            value_from: sql-warehouse
+          - name: DEMO_JOB_ID
+            value_from: demo-job
+      resources:
+        - name: sql-warehouse
+          sql_warehouse:
+            id: ${var.warehouse_id}
+            permission: CAN_USE
+        # Lets the app start the demo and stop it (run_now, cancel, list runs).
+        - name: demo-job
+          job:
+            id: ${resources.jobs.zerobus_pump_demo.id}
+            permission: CAN_MANAGE_RUN

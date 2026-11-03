@@ -1,0 +1,13 @@
+resources:
+  pipelines:
+    zerobus_pump_silver:
+      name: zerobus_pump_silver
+      catalog: ${var.catalog}
+      schema: ${resources.schemas.zerobus_pump_schema.name}
+      serverless: true
+      channel: CURRENT
+      libraries:
+        - file:
+            path: ../solution/pump_silver_pipeline.py
+      configuration:
+        bronze_table: ${var.catalog}.${resources.schemas.zerobus_pump_schema.name}.pump_tags_bronze

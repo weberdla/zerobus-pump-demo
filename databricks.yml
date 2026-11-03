@@ -1,0 +1,47 @@
+# Zerobus Ingest pump demo as a Databricks Asset Bundle.
+# See solution/README.md for setup, the demo run, and cleanup.
+
+bundle:
+  name: zerobus_pump_demo
+
+include:
+  - resources/*.yml
+
+sync:
+  exclude:
+    - "*.pdf"
+    - tools/**
+
+variables:
+  catalog:
+    description: Catalog for the demo schema. You need CREATE SCHEMA on it and the right to grant USE CATALOG.
+    default: main
+  schema:
+    description: Schema created for the demo tables.
+    default: zerobus_pump_demo
+  zerobus_endpoint:
+    description: Zerobus Ingest endpoint, https://<workspace-id>.zerobus.<region>.<cloud domain>. Written by solution/zerobus_sp.sh setup.
+  sp_application_id:
+    description: Application ID of the service principal the simulator authenticates as. Written by solution/zerobus_sp.sh setup.
+  secret_scope:
+    description: Secret scope holding client-id and client-secret for the service principal.
+    default: zerobus-pump-demo
+  warehouse_id:
+    description: SQL warehouse for the dashboard.
+    lookup:
+      warehouse: Serverless Starter Warehouse
+  demo_minutes:
+    description: How long the demo job streams pump data.
+    default: "15"
+  fault:
+    description: Fault the simulated pump develops during the demo (none, bearing, cavitation).
+    default: bearing
+  app_name:
+    description: Name of the HMI Databricks App (lowercase letters, digits, and hyphens; unique in the workspace).
+    default: zerobus-pump-hmi
+
+targets:
+  # No development mode, so resource names have no dev_<user>_ or [dev <user>] prefix.
+  # To deploy a second copy in the same workspace, override the schema and app_name variables.
+  dev:
+    default: true

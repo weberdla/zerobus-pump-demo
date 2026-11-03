@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+.databricks/
+node_modules/
+solution/hmi_app/dist/
+# Generated through an internal npm mirror; the Apps build resolves package.json from the public registry.
+solution/hmi_app/package-lock.json

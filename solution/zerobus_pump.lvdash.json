@@ -1,0 +1,755 @@
+{
+  "datasets": [
+    {
+      "name": "ds_faceplate",
+      "displayName": "Pump faceplate (silver)",
+      "queryLines": [
+        "SELECT\n",
+        "  equipment_id,\n",
+        "  round(max(value) FILTER (WHERE tag_name = 'Vibration'), 2)         AS vibration_mm_s,\n",
+        "  round(max(value) FILTER (WHERE tag_name = 'BearingTemp'), 1)       AS bearing_temp_c,\n",
+        "  round(max(value) FILTER (WHERE tag_name = 'FlowRate'), 1)          AS flow_m3h,\n",
+        "  CASE\n",
+        "    WHEN max(value) FILTER (WHERE tag_name = 'Running') = 0 THEN 'STOPPED'\n",
+        "    WHEN max(value) FILTER (WHERE tag_name = 'Vibration') > 7.1\n",
+        "      OR max(value) FILTER (WHERE tag_name = 'BearingTemp') > 75 THEN 'ALARM'\n",
+        "    WHEN max(value) FILTER (WHERE tag_name = 'Vibration') > 4.5\n",
+        "      OR max(value) FILTER (WHERE tag_name = 'BearingTemp') > 65 THEN 'WARNING'\n",
+        "    ELSE 'OK'\n",
+        "  END AS health,\n",
+        "  max(event_ts) AS last_reading,\n",
+        "  round((unix_millis(current_timestamp()) - unix_millis(max(event_ts))) / 1000, 1) AS silver_lag_s\n",
+        "FROM pump_tags_current\n",
+        "GROUP BY equipment_id\n"
+      ]
+    },
+    {
+      "name": "ds_ingest",
+      "displayName": "Ingest volume (bronze)",
+      "queryLines": [
+        "SELECT count(*) AS readings_5m\n",
+        "FROM pump_tags_bronze\n",
+        "WHERE event_ts >= timestampadd(MINUTE, -5, current_timestamp())\n"
+      ]
+    },
+    {
+      "name": "ds_trend",
+      "displayName": "10-second trends (bronze)",
+      "queryLines": [
+        "SELECT\n",
+        "  timestamp_seconds(floor(unix_timestamp(event_ts) / 10) * 10) AS ts,\n",
+        "  equipment_id,\n",
+        "  avg(value) FILTER (WHERE tag_name = 'Vibration')         AS vibration_mm_s,\n",
+        "  avg(value) FILTER (WHERE tag_name = 'BearingTemp')       AS bearing_temp_c,\n",
+        "  avg(value) FILTER (WHERE tag_name = 'FlowRate')          AS flow_m3h,\n",
+        "  avg(value) FILTER (WHERE tag_name = 'DischargePressure') AS discharge_bar\n",
+        "FROM pump_tags_bronze\n",
+        "WHERE event_ts >= timestampadd(MINUTE, -30, current_timestamp())\n",
+        "GROUP BY 1, 2\n"
+      ]
+    },
+    {
+      "name": "ds_current",
+      "displayName": "Current state per tag (silver)",
+      "queryLines": [
+        "SELECT\n",
+        "  equipment_id,\n",
+        "  tag_name,\n",
+        "  round(value, 2) AS value,\n",
+        "  unit,\n",
+        "  quality,\n",
+        "  event_ts,\n",
+        "  round((unix_millis(bronze_committed_at) - unix_millis(event_ts)) / 1000, 1) AS ingest_latency_s\n",
+        "FROM pump_tags_current\n",
+        "ORDER BY equipment_id, tag_name\n"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "live_demo",
+      "displayName": "Live demo",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {
+          "widget": {
+            "name": "title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## PUMP-101 · Live telemetry with Zerobus Ingest"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "subtitle",
+            "multilineTextboxSpec": {
+              "lines": [
+                "Simulator → **Zerobus Ingest** → bronze Delta table (Change Data Feed) → **Lakeflow AUTO CDC** → silver current state. Refresh the dashboard to see new readings."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 6,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_vibration",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_faceplate",
+                  "fields": [
+                    {
+                      "name": "max(vibration_mm_s)",
+                      "expression": "MAX(`vibration_mm_s`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(vibration_mm_s)",
+                  "displayName": "Vibration (mm/s)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Vibration (mm/s)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_bearing_temp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_faceplate",
+                  "fields": [
+                    {
+                      "name": "max(bearing_temp_c)",
+                      "expression": "MAX(`bearing_temp_c`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(bearing_temp_c)",
+                  "displayName": "Bearing temperature (°C)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Bearing temperature (°C)"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_flow",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_faceplate",
+                  "fields": [
+                    {
+                      "name": "max(flow_m3h)",
+                      "expression": "MAX(`flow_m3h`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(flow_m3h)",
+                  "displayName": "Flow rate (m³/h)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Flow rate (m³/h)"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "pump_health",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_faceplate",
+                  "fields": [
+                    {
+                      "name": "equipment_id",
+                      "expression": "`equipment_id`"
+                    },
+                    {
+                      "name": "health",
+                      "expression": "`health`"
+                    },
+                    {
+                      "name": "last_reading",
+                      "expression": "`last_reading`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "equipment_id",
+                    "displayName": "Pump"
+                  },
+                  {
+                    "fieldName": "health",
+                    "displayName": "Health"
+                  },
+                  {
+                    "fieldName": "last_reading",
+                    "displayName": "Last reading"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Pump health"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_readings_5m",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_ingest",
+                  "fields": [
+                    {
+                      "name": "max(readings_5m)",
+                      "expression": "MAX(`readings_5m`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(readings_5m)",
+                  "displayName": "Readings ingested (last 5 min)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Readings ingested (last 5 min)"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 5,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_silver_lag",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_faceplate",
+                  "fields": [
+                    {
+                      "name": "max(silver_lag_s)",
+                      "expression": "MAX(`silver_lag_s`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "max(silver_lag_s)",
+                  "displayName": "Silver lag behind the pump (s)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Silver lag behind the pump (s)"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 5,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "trends_header",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### Trends · last 30 minutes (bronze, 10-second averages)"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 6,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "trend_vibration",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_trend",
+                  "fields": [
+                    {
+                      "name": "ts",
+                      "expression": "`ts`"
+                    },
+                    {
+                      "name": "equipment_id",
+                      "expression": "`equipment_id`"
+                    },
+                    {
+                      "name": "avg(vibration_mm_s)",
+                      "expression": "AVG(`vibration_mm_s`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "ts",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "Time"
+                },
+                "y": {
+                  "fieldName": "avg(vibration_mm_s)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "mm/s"
+                },
+                "color": {
+                  "fieldName": "equipment_id",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Pump"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Vibration"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 3,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "trend_bearing_temp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_trend",
+                  "fields": [
+                    {
+                      "name": "ts",
+                      "expression": "`ts`"
+                    },
+                    {
+                      "name": "equipment_id",
+                      "expression": "`equipment_id`"
+                    },
+                    {
+                      "name": "avg(bearing_temp_c)",
+                      "expression": "AVG(`bearing_temp_c`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "ts",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "Time"
+                },
+                "y": {
+                  "fieldName": "avg(bearing_temp_c)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "°C"
+                },
+                "color": {
+                  "fieldName": "equipment_id",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Pump"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Bearing temperature"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 9,
+            "width": 3,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "trend_flow",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_trend",
+                  "fields": [
+                    {
+                      "name": "ts",
+                      "expression": "`ts`"
+                    },
+                    {
+                      "name": "equipment_id",
+                      "expression": "`equipment_id`"
+                    },
+                    {
+                      "name": "avg(flow_m3h)",
+                      "expression": "AVG(`flow_m3h`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "ts",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "Time"
+                },
+                "y": {
+                  "fieldName": "avg(flow_m3h)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "m³/h"
+                },
+                "color": {
+                  "fieldName": "equipment_id",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Pump"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Flow rate"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 14,
+            "width": 3,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "trend_discharge",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_trend",
+                  "fields": [
+                    {
+                      "name": "ts",
+                      "expression": "`ts`"
+                    },
+                    {
+                      "name": "equipment_id",
+                      "expression": "`equipment_id`"
+                    },
+                    {
+                      "name": "avg(discharge_bar)",
+                      "expression": "AVG(`discharge_bar`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "ts",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "Time"
+                },
+                "y": {
+                  "fieldName": "avg(discharge_bar)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "bar"
+                },
+                "color": {
+                  "fieldName": "equipment_id",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Pump"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Discharge pressure"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 14,
+            "width": 3,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "current_header",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### Current state · one row per tag (silver, maintained by AUTO CDC)"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 19,
+            "width": 6,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "current_state",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_current",
+                  "fields": [
+                    {
+                      "name": "equipment_id",
+                      "expression": "`equipment_id`"
+                    },
+                    {
+                      "name": "tag_name",
+                      "expression": "`tag_name`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    },
+                    {
+                      "name": "unit",
+                      "expression": "`unit`"
+                    },
+                    {
+                      "name": "quality",
+                      "expression": "`quality`"
+                    },
+                    {
+                      "name": "event_ts",
+                      "expression": "`event_ts`"
+                    },
+                    {
+                      "name": "ingest_latency_s",
+                      "expression": "`ingest_latency_s`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "equipment_id",
+                    "displayName": "Pump"
+                  },
+                  {
+                    "fieldName": "tag_name",
+                    "displayName": "Tag"
+                  },
+                  {
+                    "fieldName": "value",
+                    "displayName": "Value"
+                  },
+                  {
+                    "fieldName": "unit",
+                    "displayName": "Unit"
+                  },
+                  {
+                    "fieldName": "quality",
+                    "displayName": "Quality"
+                  },
+                  {
+                    "fieldName": "event_ts",
+                    "displayName": "Reading time"
+                  },
+                  {
+                    "fieldName": "ingest_latency_s",
+                    "displayName": "Ingest latency (s)"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Latest value per tag"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 20,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ]
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}
