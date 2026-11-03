@@ -5,6 +5,10 @@
 # MAGIC Runs the pump simulator (`pump_simulator.py`, next to this notebook) and streams its
 # MAGIC readings into the bronze table. The simulator's scheduled stops (30-60 seconds every
 # MAGIC 5-10 minutes) are turned off, so a fault develops without interruption.
+# MAGIC
+# MAGIC `warning_minutes` and `alarm_minutes` set when the fault first raises a WARNING and an ALARM
+# MAGIC (the alarm time applies to a bearing fault). Leave them empty for the defaults: 7 and 13
+# MAGIC minutes for a bearing fault, 7.5 minutes for cavitation.
 
 # COMMAND ----------
 
@@ -21,6 +25,8 @@ dbutils.widgets.text("table_name", "")
 dbutils.widgets.text("secret_scope", "")
 dbutils.widgets.text("duration_minutes", "15")
 dbutils.widgets.text("fault", "bearing")
+dbutils.widgets.text("warning_minutes", "")
+dbutils.widgets.text("alarm_minutes", "")
 
 # COMMAND ----------
 
@@ -43,10 +49,17 @@ cfg = ZerobusConfig(
 
 # COMMAND ----------
 
+def minutes(name):
+    value = dbutils.widgets.get(name).strip()
+    return float(value) if value else None
+
+
 # One scan per second; the stream is flushed and closed when the run ends or is cancelled.
 run_simulation(
     cfg,
     duration=float(dbutils.widgets.get("duration_minutes")) * 60,
     fault=dbutils.widgets.get("fault"),
     stops=False,
+    warning_minutes=minutes("warning_minutes"),
+    alarm_minutes=minutes("alarm_minutes"),
 )

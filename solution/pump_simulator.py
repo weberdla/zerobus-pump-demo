@@ -7,6 +7,7 @@ readings, as JSON, into a Unity Catalog Delta table through Zerobus Ingest.
 Run locally (connection settings come from ZEROBUS_* environment variables):
     python pump_simulator.py                  # normal operation, Ctrl+C to stop
     python pump_simulator.py --fault bearing  # bearing slowly degrades
+    python pump_simulator.py --fault bearing --warning-minutes 3 --alarm-minutes 6   # ...faster
     python pump_simulator.py --dry-run        # print records, send nothing
     python pump_simulator.py --send-stale     # send one out-of-order scan, then exit
 
@@ -43,6 +44,20 @@ TAGS = {
 RATED_RPM = 1780.0
 RATED_FLOW = 120.0  # m3/h at the best efficiency point
 AMBIENT_C = 25.0
+
+# When a fault first raises a WARNING and an ALARM on the HMI, in minutes after streaming starts.
+# Override per run with warning_minutes / alarm_minutes. Cavitation grows at a steady rate, so its
+# ALARM follows at CAVITATION_ALARM_RATIO times the warning time.
+FAULT_TIMELINE_MIN = {"bearing": (7.0, 13.0), "cavitation": (7.5, None)}
+
+# Fault levels (0-1) at which the HMI's limits are crossed, from the formulas in step(): vibration
+# 4.5 / 7.1 mm/s for a bearing fault, suction 0.8 / 0.5 bar for cavitation. Each allows for the
+# reading's noise, which reaches a limit a little before the trend does.
+VIBRATION_NOISE, SUCTION_NOISE = 0.08, 0.02
+BEARING_WARNING_LEVEL = (4.5 - 1.8 - VIBRATION_NOISE) / 6.0
+BEARING_ALARM_LEVEL = (7.1 - 1.8 - VIBRATION_NOISE) / 6.0
+CAVITATION_WARNING_LEVEL = (1.2 - 0.8 - SUCTION_NOISE) / 0.8
+CAVITATION_ALARM_RATIO = (1.2 - 0.5 - SUCTION_NOISE) / (1.2 - 0.8 - SUCTION_NOISE)  # about 1.8
 
 
 @dataclass
@@ -81,17 +96,40 @@ def now_us():
 class PumpSimulator:
     """Small physical model of a centrifugal pump with optional faults."""
 
-    def __init__(self, equipment_id="PUMP-101", site="PLANT-A", fault="none", stops=True):
+    def __init__(self, equipment_id="PUMP-101", site="PLANT-A", fault="none", stops=True,
+                 warning_minutes=None, alarm_minutes=None):
         self.equipment_id = equipment_id
         self.site = site
         self.fault = fault
         self.stops = stops
+        default_warning, default_alarm = FAULT_TIMELINE_MIN.get(fault, (None, None))
+        self.warning_s = 60 * (warning_minutes or default_warning) if default_warning else None
+        self.alarm_s = 60 * (alarm_minutes or default_alarm) if default_alarm else None
+        if self.warning_s is not None and self.warning_s <= 0:
+            raise ValueError("warning_minutes must be greater than 0")
+        if self.alarm_s is not None and self.alarm_s <= self.warning_s:
+            raise ValueError("alarm_minutes must be later than warning_minutes")
         self.running = True
         self.speed = RATED_RPM
         self.bearing_temp = AMBIENT_C + 30.0
         self.fault_level = 0.0  # 0 = healthy, 1 = fully developed fault
         self.elapsed = 0.0
         self.state_until = random.uniform(300, 600)
+
+    def _fault_level(self):
+        """How far the fault has developed (0-1), on schedule for its WARNING and ALARM times."""
+        t = self.elapsed
+        if self.fault == "bearing":
+            if t <= self.warning_s:
+                level = BEARING_WARNING_LEVEL * t / self.warning_s
+            else:
+                rate = (BEARING_ALARM_LEVEL - BEARING_WARNING_LEVEL) / (self.alarm_s - self.warning_s)
+                level = BEARING_WARNING_LEVEL + rate * (t - self.warning_s)
+        elif self.fault == "cavitation":
+            level = CAVITATION_WARNING_LEVEL * t / self.warning_s
+        else:
+            level = 0.0
+        return min(1.0, level)
 
     def _update_run_state(self):
         # Run for 5-10 minutes, stop for 30-60 seconds, repeat.
@@ -111,8 +149,7 @@ class PumpSimulator:
         self.speed += (target_rpm - self.speed) * min(1.0, dt / 5.0)
         n = self.speed / RATED_RPM  # speed fraction, 0..1
 
-        if self.fault != "none":
-            self.fault_level = min(1.0, self.fault_level + dt / 900.0)  # fully developed after ~15 min
+        self.fault_level = self._fault_level()
         bearing = self.fault_level if self.fault == "bearing" else 0.0
         cavitation = self.fault_level if self.fault == "cavitation" else 0.0
 
@@ -162,9 +199,9 @@ class PumpSimulator:
 
 
 def run_simulation(cfg, equipment_id="PUMP-101", site="PLANT-A", interval=1.0, duration=None,
-                   fault="none", stops=True, dry_run=False):
+                   fault="none", stops=True, dry_run=False, warning_minutes=None, alarm_minutes=None):
     """Stream pump scans to Zerobus until `duration` seconds pass or the run is interrupted."""
-    pump = PumpSimulator(equipment_id, site, fault, stops)
+    pump = PumpSimulator(equipment_id, site, fault, stops, warning_minutes, alarm_minutes)
     stream = None if dry_run else cfg.open_stream()
     if stream:
         log.info("Stream open to %s", cfg.table_name)
@@ -222,6 +259,9 @@ def main():
     parser.add_argument("--duration", type=float, help="stop after N seconds (default: run until Ctrl+C)")
     parser.add_argument("--fault", choices=["none", "bearing", "cavitation"], default="none")
     parser.add_argument("--no-stops", action="store_true", help="keep the pump running the whole time")
+    parser.add_argument("--warning-minutes", type=float, help="minutes until the fault's first WARNING "
+                        "(default: 7 bearing, 7.5 cavitation)")
+    parser.add_argument("--alarm-minutes", type=float, help="minutes until a bearing fault's first ALARM (default: 13)")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", help="print records instead of sending them")
     mode.add_argument("--send-stale", action="store_true", help="send one out-of-order scan, then exit")
@@ -234,7 +274,7 @@ def main():
             send_stale_records(cfg, args.equipment_id, args.site)
         else:
             run_simulation(cfg, args.equipment_id, args.site, args.interval, args.duration,
-                           args.fault, not args.no_stops, args.dry_run)
+                           args.fault, not args.no_stops, args.dry_run, args.warning_minutes, args.alarm_minutes)
     except NonRetriableException as e:
         log.error("Zerobus rejected the request: %s", e)
         log.error("Check the endpoint, table name, service principal credentials, and grants.")

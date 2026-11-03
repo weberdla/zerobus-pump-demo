@@ -90,7 +90,7 @@ databricks apps stop zerobus-pump-hmi -p <profile>
 
 ## 3. Run the demo
 
-**From the app** (best for the room): open the app's URL, which `bundle run zerobus_pump_hmi` prints and which is also listed under **Compute** > **Apps**. This is the plant screen described below. On its **Demo control** tab, choose a fault (**Healthy**, **Bearing fault**, or **Cavitation**) and a duration, then click **▶ Start demo**.
+**From the app** (best for the room): open the app's URL, which `bundle run zerobus_pump_hmi` prints and which is also listed under **Compute** > **Apps**. This is the plant screen described below. On its **Demo control** tab, choose a fault (**Healthy**, **Bearing fault**, or **Cavitation**), when it should raise its first WARNING and ALARM, and a duration, then click **▶ Start demo**.
 
 **From the CLI**, the same job:
 
@@ -98,9 +98,23 @@ databricks apps stop zerobus-pump-hmi -p <profile>
 databricks bundle run zerobus_pump_demo -p <profile>
 # shorter run, different fault:
 databricks bundle run zerobus_pump_demo -p <profile> --params demo_minutes=5,fault=cavitation
+# a faster bearing fault: WARNING at 2 minutes, ALARM at 4
+databricks bundle run zerobus_pump_demo -p <profile> --params demo_minutes=6,fault=bearing,warning_minutes=2,alarm_minutes=4
 ```
 
-The defaults are 15 minutes with a developing **bearing fault**. In validation:
+The defaults are 15 minutes with a developing **bearing fault**.
+
+You set how fast the fault develops by choosing when its first WARNING and ALARM appear, in minutes
+after streaming starts. Leave `warning_minutes` and `alarm_minutes` empty for the defaults:
+
+| Fault | First WARNING | First ALARM |
+|-------|---------------|-------------|
+| Bearing fault | Vibration over 4.5 mm/s at `warning_minutes`, default 7 | Vibration over 7.1 mm/s at `alarm_minutes`, default 13 |
+| Cavitation | Suction pressure under 0.8 bar at `warning_minutes`, default 7.5 | Suction pressure under 0.5 bar at about 1.8 × `warning_minutes`, about 13.4 by default. The alarm time can't be set separately. |
+
+The screen shows each one about 15 seconds after it happens. Bearing temperature follows vibration
+by a minute or two, because the bearing heats up slowly. Make the duration longer than the alarm
+time if you want the room to see the alarm. In validation:
 
 - streaming started about 30 seconds after the job started;
 - silver was live about a minute in;
@@ -120,14 +134,14 @@ example **Live · 12:34**, so you can follow the run from the other tabs.
   - As the bearing fault develops, the bearing housing glows amber, then red, and vibration waves pulse around it.
   - During cavitation, vapour bubbles appear at the pump inlet.
 - **Trends & tags:** 10-minute trends of bearing vibration and temperature from bronze, with their H and HH limits, and the silver tag table with each value's quality and age.
-- **Demo control:** choose the fault and the duration, start and stop the demo, and follow the run.
+- **Demo control:** choose the fault, when it raises its first WARNING and ALARM, and the duration; start and stop the demo; and follow the run. The tab checks the times: the alarm must come after the warning, and it tells you if either comes after the demo ends.
   - The run status says where the run is: creating the bronze table, starting the simulator, streaming into bronze, live, and stopping. It's based on the job's task states and on the data reaching the screen: **Live** means this run's readings have reached silver. While you wait, it counts down to the next step.
   - The job's four tasks are listed as waiting, running, or done, with a link to the job run.
   - **■ Stop** cancels the run and then stops the live pipeline. In validation, the pipeline was idle about 30 seconds after clicking Stop.
 
 Also on the screen:
 
-- **Alarm annunciator:** WARNING and ALARM rows flash until you click **ACK**, and the health indicator in the top bar follows the worst alarm. Between demo runs, silver keeps the last run's values, so the health indicator reads **IDLE · last values**, any alarm rows are greyed out and marked **last run**, and the top bar shows the time of the last reading instead of the silver lag. With the bearing fault, WARNING appeared after about 7 minutes in validation, and ALARM comes at about 13. Cavitation warnings need about 7-8 minutes, so give that fault at least 10.
+- **Alarm annunciator:** WARNING and ALARM rows flash until you click **ACK**, and the health indicator in the top bar follows the worst alarm. Between demo runs, silver keeps the last run's values, so the health indicator reads **IDLE · last values**, any alarm rows are greyed out and marked **last run**, and the top bar shows the time of the last reading instead of the silver lag. With the default times, the bearing fault raises its first WARNING at about 7 minutes and its first ALARM at about 13; cavitation raises its first WARNING at about 7.5 minutes.
 - **Silver lag** in the top bar stayed around 12-19 seconds on screen while streaming. That's the pipeline's 8-12 seconds plus the screen's 3-second refresh.
 
 The app reads with its own service principal. The demo job's first task grants it `USE CATALOG`, plus `USE SCHEMA` and `SELECT` on the demo schema. Until the first demo run, the screen shows "Waiting for the first demo run". The app only queries the warehouse while a demo runs and for about 90 seconds afterwards, so leaving the screen open doesn't keep the warehouse awake.

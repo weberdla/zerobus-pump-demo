@@ -168,7 +168,20 @@ footer { margin-top: 10px; font-size: 12px; color: var(--muted); text-align: cen
 .control-row button.stop { background: rgba(255, 77, 79, 0.14); border-color: var(--red); color: #fca5a5; }
 .control-row button:disabled { opacity: 0.35; cursor: default; }
 .field-label { font-size: 11px; color: var(--muted); letter-spacing: 0.1em; margin-bottom: 4px; }
-.fault-help { min-height: 2.6em; margin: 8px 0 4px; font-size: 13px; color: var(--text); }
+.fault-help { margin: 10px 0 8px; font-size: 13px; color: var(--text); line-height: 1.45; }
+.timeline-row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.timeline-row label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.time-input { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.time-input input {
+  width: 64px; padding: 6px 8px; border-radius: 6px; border: 1px solid #2b3a44;
+  background: #0b1318; color: var(--text); font: inherit; font-family: var(--mono); font-size: 14px;
+}
+.time-input input:disabled { opacity: 0.6; }
+.derived { font-size: 13px; color: var(--muted); }
+.derived b { color: var(--text); font-family: var(--mono); }
+.timeline-note { margin: 6px 0 4px; font-size: 12px; color: var(--muted); min-height: 1.4em; }
+.timeline-note.warn { color: var(--amber); }
+.timeline-note.error { color: #fca5a5; }
 .controls .small { margin-top: 14px; line-height: 1.5; }
 
 .run-panel { padding: 14px; }

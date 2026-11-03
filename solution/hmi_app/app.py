@@ -17,7 +17,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from plant_data import LiveSource, MockSource
 
@@ -28,6 +28,15 @@ app = FastAPI(title="Zerobus pump HMI")
 class StartRequest(BaseModel):
     fault: Literal["none", "bearing", "cavitation"] = "bearing"
     minutes: int = Field(15, ge=1, le=60)
+    # Minutes until the first WARNING and (bearing fault) ALARM; None = the fault's defaults.
+    warning_minutes: float | None = Field(None, gt=0, le=60)
+    alarm_minutes: float | None = Field(None, gt=0, le=60)
+
+    @model_validator(mode="after")
+    def alarm_after_warning(self):
+        if self.warning_minutes and self.alarm_minutes and self.alarm_minutes <= self.warning_minutes:
+            raise ValueError("The alarm must come after the warning.")
+        return self
 
 
 @app.get("/api/state")
@@ -37,7 +46,7 @@ def state():
 
 @app.post("/api/demo/start")
 def start_demo(request: StartRequest):
-    return source.start_demo(request.fault, request.minutes)
+    return source.start_demo(request.fault, request.minutes, request.warning_minutes, request.alarm_minutes)
 
 
 @app.post("/api/demo/stop")

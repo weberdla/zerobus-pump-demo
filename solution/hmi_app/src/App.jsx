@@ -168,7 +168,8 @@ export default function App() {
             status={status}
             busy={busy}
             notice={notice}
-            onStart={(fault, minutes) => control("start", "/api/demo/start", { fault, minutes })}
+            onStart={(fault, minutes, warning, alarm) =>
+              control("start", "/api/demo/start", { fault, minutes, warning_minutes: warning, alarm_minutes: alarm })}
             onStop={() => control("stop", "/api/demo/stop", {})}
           />
         )}

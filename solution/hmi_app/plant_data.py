@@ -154,10 +154,14 @@ class LiveSource:
         self.status, self.status_at = status, time.time()
         return status
 
-    def start_demo(self, fault, minutes):
+    def start_demo(self, fault, minutes, warning_minutes=None, alarm_minutes=None):
         if self.demo_status(force=True)["active"]:
             return {"ok": False, "message": "A demo run is already in progress."}
-        run = self.w.jobs.run_now(job_id=self.job_id, job_parameters={"fault": fault, "demo_minutes": str(minutes)})
+        param = lambda value: "" if value is None else f"{value:g}"
+        run = self.w.jobs.run_now(job_id=self.job_id, job_parameters={
+            "fault": fault, "demo_minutes": str(minutes),
+            "warning_minutes": param(warning_minutes), "alarm_minutes": param(alarm_minutes),
+        })
         self.status_at = 0.0
         return {"ok": True, "run_id": run.response.run_id}
 
@@ -243,12 +247,15 @@ class MockSource:
                                  "fault": self.run["fault"], "minutes": self.run["minutes"]}
                 self.run = None
 
-    def start_demo(self, fault, minutes):
+    def start_demo(self, fault, minutes, warning_minutes=None, alarm_minutes=None):
         with self.lock:
+            self._advance()  # finish a run that ended since the last poll
             if self.run:
                 return {"ok": False, "message": "A demo run is already in progress."}
-            self.pump = self.PumpSimulator(fault=fault, stops=False)
-            self.run = {"fault": fault, "minutes": minutes, "started": time.time()}
+            self.pump = self.PumpSimulator(fault=fault, stops=False, warning_minutes=warning_minutes,
+                                           alarm_minutes=alarm_minutes)
+            self.run = {"fault": fault, "minutes": minutes, "started": time.time(),
+                        "warning_minutes": warning_minutes, "alarm_minutes": alarm_minutes}
         return {"ok": True, "run_id": 0}
 
     def stop_demo(self):
@@ -275,6 +282,7 @@ class MockSource:
             "stop_live_silver": stage(stream_end, stream_end + t["stop"]),
         }
         return {"active": True, "phase": "Mock run", "fault": self.run["fault"], "minutes": self.run["minutes"],
+                "warning_minutes": self.run["warning_minutes"], "alarm_minutes": self.run["alarm_minutes"],
                 "run_url": None, "started_at": iso(started), "stop_only": False,
                 "streaming_started_at": iso(started + t["streaming"]) if elapsed >= t["streaming"] else None,
                 "steps": [{"key": key, "state": steps[key]} for key in STEPS]}
@@ -319,6 +327,14 @@ def build_state(source, tags, trend, demo, data_at, error):
 
 def _num(value):
     return None if value is None else float(value)
+
+
+def _float(text):
+    """A number from a job parameter; None when empty (use the default)."""
+    try:
+        return float(text) if text else None
+    except ValueError:
+        return None
 
 
 def _ms_to_iso(ms):
@@ -367,6 +383,8 @@ def _describe_active_run(run):
         "run_url": run.run_page_url,
         "fault": params.get("fault"),
         "minutes": int(params["demo_minutes"]) if params.get("demo_minutes") else None,
+        "warning_minutes": _float(params.get("warning_minutes")),
+        "alarm_minutes": _float(params.get("alarm_minutes")),
         "started_at": _ms_to_iso(run.start_time),
         "streaming_started_at": _ms_to_iso(stream.start_time) if stream and states.get("stream_pump_data") == "RUNNING" else None,
         "stop_only": _stop_only(run),

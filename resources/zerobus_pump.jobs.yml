@@ -23,6 +23,11 @@ resources:
           default: ${var.demo_minutes}
         - name: fault
           default: ${var.fault}
+        # Minutes until the fault's first WARNING and (bearing fault) ALARM; empty = the fault's defaults.
+        - name: warning_minutes
+          default: ""
+        - name: alarm_minutes
+          default: ""
       tasks:
         - task_key: create_bronze
           notebook_task:
@@ -54,6 +59,8 @@ resources:
               secret_scope: ${var.secret_scope}
               duration_minutes: "{{job.parameters.demo_minutes}}"
               fault: "{{job.parameters.fault}}"
+              warning_minutes: "{{job.parameters.warning_minutes}}"
+              alarm_minutes: "{{job.parameters.alarm_minutes}}"
 
         # Runs even if streaming fails, so the live pipeline never keeps running unattended.
         - task_key: stop_live_silver
