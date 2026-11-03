@@ -96,10 +96,25 @@ export default function App() {
   }
 
   const { tags, limits, health, alarms, trend } = state;
-  const value = (name) => tags[name]?.value ?? null;
   const status = describeDemo(demo, { trend, tags, now, request, busy });
   // Between demo runs, silver still holds the last run's values: label them rather than judge them.
   const idle = !demo?.active && request?.kind !== "start" && Object.keys(tags).length > 0;
+
+  // From Start until this run's readings arrive, the tables still hold the last run's values. Show only
+  // readings from this run, so the screen starts blank instead of re-raising the last run's alarms.
+  const runStart = request?.kind === "start" ? request.at
+    : demo?.active && !demo.stop_only && demo.started_at ? Date.parse(demo.started_at) : null;
+  const shown = runStart
+    ? {
+        tags: Object.fromEntries(Object.entries(tags).filter(([, t]) => t.event_ts && Date.parse(t.event_ts) >= runStart)),
+        trend: trend.filter((p) => Date.parse(p.ts) + 10_000 > runStart), // 10-second buckets
+      }
+    : { tags, trend };
+  shown.alarms = runStart ? alarms.filter((a) => a.tag in shown.tags) : alarms; // worst first, from the backend
+  const waiting = runStart != null && Object.keys(shown.tags).length === 0;
+  const shownHealth = !runStart ? health
+    : shown.alarms[0]?.severity ?? ((shown.tags.Running?.value ?? 0) >= 0.5 ? "OK" : "STOPPED");
+  const value = (name) => shown.tags[name]?.value ?? null;
 
   return (
     <div className="hmi">
@@ -114,8 +129,12 @@ export default function App() {
           <div className="health idle">
             IDLE<small>last values</small>
           </div>
+        ) : waiting ? (
+          <div className="health waiting">
+            STARTING<small>waiting for data</small>
+          </div>
         ) : (
-          <div className={`health ${health.replace(" ", "-").toLowerCase()}`}>{health}</div>
+          <div className={`health ${shownHealth.replace(" ", "-").toLowerCase()}`}>{shownHealth}</div>
         )}
         <div className="meta">
           <div className="clock">{new Date(now).toLocaleTimeString([], { hour12: false })}</div>
@@ -123,7 +142,7 @@ export default function App() {
             {idle && state.newest_reading_at ? (
               <>Last reading <b>{new Date(state.newest_reading_at).toLocaleTimeString([], { hour12: false })}</b></>
             ) : (
-              <>Silver lag <b>{state.silver_lag_s == null ? "--" : `${state.silver_lag_s.toFixed(1)} s`}</b></>
+              <>Silver lag <b>{waiting || state.silver_lag_s == null ? "--" : `${state.silver_lag_s.toFixed(1)} s`}</b></>
             )}
           </div>
         </div>
@@ -144,7 +163,7 @@ export default function App() {
         </div>
       </nav>
 
-      <AlarmPanel alarms={alarms} idle={idle} />
+      <AlarmPanel alarms={shown.alarms} idle={idle} waiting={waiting} />
       {error && <div className="banner error">Connection lost ({error}). Showing the last values received.</div>}
       {state.message && <div className="banner info">{state.message}</div>}
 
@@ -152,7 +171,7 @@ export default function App() {
         {tab === "pump" && (
           <>
             <section className="panel graphic">
-              <PumpGraphic tags={tags} limits={limits} />
+              <PumpGraphic tags={shown.tags} limits={limits} />
             </section>
             <section className="panel gauges">
               <Gauge label="Vibration" tag="VI-101" unit="mm/s" value={value("Vibration")} limits={limits.Vibration} decimals={2} />
@@ -176,12 +195,12 @@ export default function App() {
         {tab === "trends" && (
           <>
             <section className="panel trends">
-              <Trend points={trend} field="vibration" label="Bearing vibration · VI-101" unit="mm/s" limits={limits.Vibration}
+              <Trend points={shown.trend} field="vibration" label="Bearing vibration · VI-101" unit="mm/s" limits={limits.Vibration}
                      color="#38bdf8" now={now} decimals={2} />
-              <Trend points={trend} field="bearing_temp" label="Bearing temperature · TI-101" unit="°C" limits={limits.BearingTemp}
+              <Trend points={shown.trend} field="bearing_temp" label="Bearing temperature · TI-101" unit="°C" limits={limits.BearingTemp}
                      color="#c084fc" now={now} />
             </section>
-            <TagTable tags={tags} now={now} />
+            <TagTable tags={shown.tags} now={now} />
           </>
         )}
       </main>

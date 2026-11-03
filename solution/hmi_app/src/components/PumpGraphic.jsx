@@ -31,6 +31,7 @@ function Instrument({ x, y, tag, to, label, value, unit, state = "normal", box }
 
 export default function PumpGraphic({ tags, limits }) {
   const v = (name) => tags[name]?.value ?? null;
+  // Animations treat a missing reading as 0; the numbers shown are "--" instead.
   const running = (v("Running") ?? 0) >= 0.5;
   const speed = v("MotorSpeed") ?? 0;
   const flow = v("FlowRate") ?? 0;
@@ -119,7 +120,7 @@ export default function PumpGraphic({ tags, limits }) {
         <text x={520} y={318} className="bearing-label">DE BEARING</text>
         <rect x={484} y={334} width={72} height={8} rx={4} className="heat-track" />
         <rect x={484} y={334} width={72 * heat} height={8} rx={4} style={{ fill: COLORS[tempState] }} />
-        <text x={520} y={360} className="bearing-temp" style={{ fill: COLORS[tempState] }}>{fmt(bearingTemp, 1)} °C</text>
+        <text x={520} y={360} className="bearing-temp" style={{ fill: COLORS[tempState] }}>{fmt(v("BearingTemp"), 1)} °C</text>
         {vibration > 2.6 &&
           [0, 1, 2].map((i) => (
             <g key={i} className={`vib-wave ${vibState}`} style={{ animationDelay: `${i * 0.18}s`, stroke: COLORS[vibState] }}>
@@ -146,15 +147,15 @@ export default function PumpGraphic({ tags, limits }) {
       <Instrument x={470} y={42} tag="PI-102" to={[64, 88]} box={[500, 19]} label="DISCHARGE PRESSURE"
                   value={fmt(v("DischargePressure"), 2)} unit="bar" />
       <Instrument x={760} y={42} tag="FI-101" to={[64, 88]} box={[790, 19]} label="FLOW"
-                  value={fmt(flow, 1)} unit="m³/h" />
+                  value={fmt(v("FlowRate"), 1)} unit="m³/h" />
       <Instrument x={520} y={212} tag="TI-101" to={[234, 288]} box={[550, 189]} label="BEARING TEMP"
-                  value={fmt(bearingTemp, 1)} unit="°C" state={tempState} />
+                  value={fmt(v("BearingTemp"), 1)} unit="°C" state={tempState} />
       <Instrument x={720} y={204} tag="II-101" to={[226, 255]} box={[750, 181]} label="MOTOR CURRENT"
                   value={fmt(v("MotorCurrent"), 1)} unit="A" />
       <Instrument x={520} y={506} tag="VI-101" to={[484, 372]} box={[550, 483]} label="VIBRATION"
-                  value={fmt(vibration, 2)} unit="mm/s" state={vibState} />
+                  value={fmt(v("Vibration"), 2)} unit="mm/s" state={vibState} />
       <Instrument x={720} y={506} tag="SI-101" to={[484, 405]} box={[750, 483]} label="SPEED"
-                  value={fmt(speed, 0)} unit="rpm" />
+                  value={fmt(v("MotorSpeed"), 0)} unit="rpm" />
     </svg>
   );
 }

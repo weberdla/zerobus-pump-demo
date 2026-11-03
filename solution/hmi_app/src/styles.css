@@ -43,7 +43,8 @@ button, select { font: inherit; }
 .health.warning { color: var(--amber); border-color: var(--amber); background: rgba(245, 165, 36, 0.12); }
 .health.alarm { color: #fff; border-color: var(--red); background: rgba(255, 77, 79, 0.85); animation: blink 1s steps(2) infinite; }
 .health.stopped, .health.no-data, .health.idle { color: var(--muted); border-color: #3a4a54; }
-.health.idle { padding-top: 5px; padding-bottom: 5px; }
+.health.idle, .health.waiting { padding-top: 5px; padding-bottom: 5px; }
+.health.waiting { color: #93c5fd; border-color: #2b6a86; background: rgba(56, 189, 248, 0.08); }
 .health small { display: block; margin-top: 1px; font-size: 10px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; }
 .meta { text-align: right; font-family: var(--mono); }
 .clock { font-size: 26px; color: #eaf4f7; }

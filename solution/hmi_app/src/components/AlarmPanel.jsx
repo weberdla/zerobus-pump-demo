@@ -4,11 +4,11 @@ const clock = (iso) => new Date(iso).toLocaleTimeString([], { hour12: false });
 
 // Annunciator: unacknowledged alarms flash until an operator clicks ACK. Between demo runs (idle) the
 // alarms come from the last run's values, so they're shown greyed out, without flashing or ACK.
-export default function AlarmPanel({ alarms, idle }) {
+export default function AlarmPanel({ alarms, idle, waiting }) {
   const [acked, setAcked] = useState(() => new Set());
 
   if (!alarms.length) {
-    return <div className="alarms quiet">● No active alarms</div>;
+    return <div className="alarms quiet">● {waiting ? "Waiting for this run's readings" : "No active alarms"}</div>;
   }
   return (
     <div className="alarms">

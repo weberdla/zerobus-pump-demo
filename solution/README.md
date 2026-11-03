@@ -196,7 +196,7 @@ Then start the demo in one of two ways:
 
 - **Keep the existing data**: click **▶ Start demo** in the app, or run `databricks bundle run zerobus_pump_demo -p <profile>`.
 
-  The simulated pump starts healthy again. Until the new run's silver goes live, about 1.5 minutes after the start, the screen keeps showing the previous run's last values. Then the new readings replace them. The trend charts show the last 10 minutes (app) and 30 minutes (dashboard), so earlier readings appear only if the previous run ended within that window.
+  The simulated pump starts healthy again. From the moment you start the run until its readings reach silver, about 1.5 minutes, the plant screen shows only readings from the new run: the values are blank, the health indicator reads **STARTING · waiting for data**, and the previous run's alarms don't come back. The dashboard keeps showing the previous run's last values until the new readings replace them. The trend charts show the last 10 minutes (app) and 30 minutes (dashboard), so earlier readings appear only if the previous run ended within that window.
 
 - **Start from empty tables**: destroy and redeploy the bundle, then start the app and run the demo.
 
