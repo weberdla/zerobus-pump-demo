@@ -158,7 +158,7 @@ export default function App() {
           ))}
         </div>
         <div className="datapath">
-          <span>Simulator</span>→<span>Zerobus Ingest</span>→<span>Bronze · CDF</span>→<span>AUTO CDC</span>→
+          <span>{demo?.active && demo.simulator === false ? "External feed" : "Simulator"}</span>→<span>Zerobus Ingest</span>→<span>Bronze · CDF</span>→<span>AUTO CDC</span>→
           <span className="here">Silver current state</span>
         </div>
       </nav>
@@ -191,8 +191,8 @@ export default function App() {
             status={status}
             busy={busy}
             notice={notice}
-            onStart={(fault, minutes, warning, alarm) =>
-              control("start", "/api/demo/start", { fault, minutes, warning_minutes: warning, alarm_minutes: alarm })}
+            onStart={(fault, minutes, warning, alarm, simulator) =>
+              control("start", "/api/demo/start", { fault, minutes, warning_minutes: warning, alarm_minutes: alarm, simulator })}
             onStop={() => control("stop", "/api/demo/stop", {})}
           />
         )}

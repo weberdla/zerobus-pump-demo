@@ -31,6 +31,8 @@ class StartRequest(BaseModel):
     # Minutes until the first WARNING and (bearing fault) ALARM; None = the fault's defaults.
     warning_minutes: float | None = Field(None, gt=0, le=60)
     alarm_minutes: float | None = Field(None, gt=0, le=60)
+    # False: run the demo without the simulator, for another data feed to the Zerobus endpoint.
+    simulator: bool = True
 
     @model_validator(mode="after")
     def alarm_after_warning(self):
@@ -46,7 +48,8 @@ def state():
 
 @app.post("/api/demo/start")
 def start_demo(request: StartRequest):
-    return source.start_demo(request.fault, request.minutes, request.warning_minutes, request.alarm_minutes)
+    return source.start_demo(request.fault, request.minutes, request.warning_minutes, request.alarm_minutes,
+                             request.simulator)
 
 
 @app.post("/api/demo/stop")

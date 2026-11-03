@@ -9,6 +9,10 @@
 # MAGIC `warning_minutes` and `alarm_minutes` set when the fault first raises a WARNING and an ALARM
 # MAGIC (the alarm time applies to a bearing fault). Leave them empty for the defaults: 7 and 13
 # MAGIC minutes for a bearing fault, 7.5 minutes for cavitation.
+# MAGIC
+# MAGIC With `simulator` set to `off`, another source (for example, Ignition) sends the readings. The
+# MAGIC notebook then streams nothing; it keeps the run, and so the live silver pipeline, going for the
+# MAGIC demo's duration, and reports how many readings reach bronze each minute.
 
 # COMMAND ----------
 
@@ -27,6 +31,23 @@ dbutils.widgets.text("duration_minutes", "15")
 dbutils.widgets.text("fault", "bearing")
 dbutils.widgets.text("warning_minutes", "")
 dbutils.widgets.text("alarm_minutes", "")
+dbutils.widgets.text("simulator", "on")
+
+# COMMAND ----------
+
+import time
+
+duration_s = float(dbutils.widgets.get("duration_minutes")) * 60
+if dbutils.widgets.get("simulator").strip().lower() == "off":
+    bronze = dbutils.widgets.get("table_name")
+    end = time.monotonic() + duration_s
+    print(f"Simulator off: keeping the live pipeline going for {duration_s / 60:g} minutes for another data feed.")
+    while time.monotonic() < end:
+        time.sleep(min(60.0, end - time.monotonic()))
+        # Read the table again each time, so the count includes the newest commits.
+        readings = spark.table(bronze).where("event_ts >= current_timestamp() - INTERVAL 1 MINUTE").count()
+        print(f"{readings} readings reached bronze in the last minute")
+    dbutils.notebook.exit("simulator off")
 
 # COMMAND ----------
 
@@ -57,7 +78,7 @@ def minutes(name):
 # One scan per second; the stream is flushed and closed when the run ends or is cancelled.
 run_simulation(
     cfg,
-    duration=float(dbutils.widgets.get("duration_minutes")) * 60,
+    duration=duration_s,
     fault=dbutils.widgets.get("fault"),
     stops=False,
     warning_minutes=minutes("warning_minutes"),

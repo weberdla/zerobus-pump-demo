@@ -28,6 +28,9 @@ resources:
           default: ""
         - name: alarm_minutes
           default: ""
+        # "off" keeps the run and the live pipeline going without the simulator, for another data feed.
+        - name: simulator
+          default: "on"
       tasks:
         - task_key: create_bronze
           notebook_task:
@@ -61,6 +64,7 @@ resources:
               fault: "{{job.parameters.fault}}"
               warning_minutes: "{{job.parameters.warning_minutes}}"
               alarm_minutes: "{{job.parameters.alarm_minutes}}"
+              simulator: "{{job.parameters.simulator}}"
 
         # Runs even if streaming fails, so the live pipeline never keeps running unattended.
         - task_key: stop_live_silver

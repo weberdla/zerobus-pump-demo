@@ -123,6 +123,34 @@ The simulator sends a scan every second and flushes every 10 scans. Zerobus deli
 least once, so a retry can write a reading twice. Silver handles that: a duplicate has the same key
 and timestamp as the reading it repeats.
 
+### Sending readings from another source
+
+With the simulator off (see [Use another data feed](README.md#use-another-data-feed) in the instructor
+guide), another source such as Ignition sends the readings. For the plant screen and the dashboard to
+show them:
+
+- **Destination:** the same Zerobus endpoint, `https://<workspace-id>.zerobus.<region>.cloud.databricks.com`,
+  and bronze table, with records in the format above.
+- **`equipment_id`:** `PUMP-101`. The plant screen only reads that equipment. `site` can be any value.
+- **Tags:** the tag names and units in the [tags table](#tags). The screen only shows those names.
+  Send all eight, including `Running` with the value 1, or the screen shows the pump stopped.
+- **Quality:** `GOOD`, with a value. Silver drops readings without a value.
+- **`event_ts`:** when the reading was taken, in microseconds since the Unix epoch, UTC. The screen only
+  shows readings taken after the run started, and AUTO CDC keeps each tag's newest reading.
+- **Timing:** start sending once the run says it's waiting for the external feed. The run creates the
+  bronze table if it doesn't exist; destroying the bundle drops it.
+- **Credentials:** a service principal with `USE CATALOG` on the catalog, `USE SCHEMA` on the schema,
+  and `MODIFY` and `SELECT` on the bronze table. You can use the demo's, `zerobus-pump-demo-simulator`,
+  whose credentials are in the secret scope `zerobus-pump-demo`, or grant your own:
+
+  ```sql
+  GRANT USE CATALOG ON CATALOG <catalog> TO `<application-id>`;
+  GRANT USE SCHEMA ON SCHEMA <catalog>.zerobus_pump_demo TO `<application-id>`;
+  GRANT MODIFY, SELECT ON TABLE <catalog>.zerobus_pump_demo.pump_tags_bronze TO `<application-id>`;
+  ```
+
+  Revoke your own principal's grants when you're done; the cleanup script only handles the demo's.
+
 ### Silver table: `pump_tags_current`
 
 The silver pipeline keeps one row per tag, the latest reading, with AUTO CDC (SCD Type 1). It has the

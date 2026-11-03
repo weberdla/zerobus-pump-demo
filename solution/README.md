@@ -135,7 +135,7 @@ example **Live · 12:34**, so you can follow the run from the other tabs.
   - As the bearing fault develops, the bearing housing glows amber, then red, and vibration waves pulse around it.
   - During cavitation, vapour bubbles appear at the pump inlet.
 - **Trends & tags:** 10-minute trends of bearing vibration and temperature from bronze, with their H and HH limits, and the silver tag table with each value's quality and age.
-- **Demo control:** choose the fault, when it raises its first WARNING and ALARM, and the duration; start and stop the demo; and follow the run. The tab checks the times: the alarm must come after the warning, and it tells you if either comes after the demo ends.
+- **Demo control:** choose the fault, when it raises its first WARNING and ALARM, and the duration; start and stop the demo; and follow the run. The tab checks the times: the alarm must come after the warning, and it tells you if either comes after the demo ends. **Turn the simulator off** runs the demo for another data feed instead; see [Use another data feed](#use-another-data-feed).
   - The run status says where the run is: creating the bronze table, starting the simulator, streaming into bronze, live, and stopping. It's based on the job's task states and on the data reaching the screen: **Live** means this run's readings have reached silver. While you wait, it counts down to the next step.
   - The job's four tasks are listed as waiting, running, or done, with a link to the job run.
   - **■ Stop** cancels the run and then stops the live pipeline. In validation, the pipeline was idle about 30 seconds after clicking Stop.
@@ -166,6 +166,24 @@ When the stream finishes, the job stops the live pipeline. Nothing is left runni
 > ```bash
 > databricks bundle run zerobus_pump_demo -p <profile> --only stop_live_silver
 > ```
+
+### Use another data feed
+
+To show readings from another source, such as Ignition, instead of the simulator:
+
+1. On the **Demo control** tab, check **Turn the simulator off**, choose a duration, and click **▶ Start demo**. From the CLI:
+
+   ```bash
+   databricks bundle run zerobus_pump_demo -p <profile> --params simulator=off,demo_minutes=30
+   ```
+
+2. Wait until the run status says **Waiting for the external feed**. By then the job has created the bronze table and its grants, and the live silver pipeline is running.
+3. Start your feed. It sends `PUMP-101` readings to the Zerobus endpoint, into `<catalog>.zerobus_pump_demo.pump_tags_bronze`. [Sending readings from another source](tag-reference.md#sending-readings-from-another-source) in the tag reference lists what to send. The setup script wrote the endpoint and catalog to `.databricks/bundle/dev/variable-overrides.json`, as `zerobus_endpoint` and `catalog`.
+
+The plant screen and the dashboard then work as they do with the simulator. The fault settings don't apply.
+
+- **The job** keeps the live pipeline going for the duration, then stops it, as with the simulator. Its streaming task logs how many readings reached bronze each minute.
+- **After the run**, readings your feed sends still land in bronze, but silver only picks them up in the next run. The plant screen shows only readings sent during the current run.
 
 ## 4. Run it again (already deployed)
 

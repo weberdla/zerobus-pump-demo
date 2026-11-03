@@ -154,13 +154,14 @@ class LiveSource:
         self.status, self.status_at = status, time.time()
         return status
 
-    def start_demo(self, fault, minutes, warning_minutes=None, alarm_minutes=None):
+    def start_demo(self, fault, minutes, warning_minutes=None, alarm_minutes=None, simulator=True):
         if self.demo_status(force=True)["active"]:
             return {"ok": False, "message": "A demo run is already in progress."}
         param = lambda value: "" if value is None else f"{value:g}"
         run = self.w.jobs.run_now(job_id=self.job_id, job_parameters={
             "fault": fault, "demo_minutes": str(minutes),
             "warning_minutes": param(warning_minutes), "alarm_minutes": param(alarm_minutes),
+            "simulator": "on" if simulator else "off",
         })
         self.status_at = 0.0
         return {"ok": True, "run_id": run.response.run_id}
@@ -226,7 +227,7 @@ class MockSource:
     def _advance(self):
         now, t = time.time(), self.MOCK_TIMELINE_S
         elapsed = self._elapsed()
-        streaming = (elapsed is not None and not self.run.get("stopped")
+        streaming = (elapsed is not None and not self.run.get("stopped") and self.run["simulator"]
                      and t["streaming"] <= elapsed < t["streaming"] + self.run["minutes"] * 60)
         if streaming and not self.streaming:
             # This run's readings replace the last run's, from the moment streaming began.
@@ -244,17 +245,18 @@ class MockSource:
             if now > end + t["stop"]:
                 result = "CANCELED" if self.run.get("stopped") else "SUCCESS"
                 self.last_run = {"run_id": 0, "result": result, "ended_at": utcnow().isoformat(), "run_url": None,
-                                 "fault": self.run["fault"], "minutes": self.run["minutes"]}
+                                 "fault": self.run["fault"], "minutes": self.run["minutes"],
+                                 "simulator": self.run["simulator"]}
                 self.run = None
 
-    def start_demo(self, fault, minutes, warning_minutes=None, alarm_minutes=None):
+    def start_demo(self, fault, minutes, warning_minutes=None, alarm_minutes=None, simulator=True):
         with self.lock:
             self._advance()  # finish a run that ended since the last poll
             if self.run:
                 return {"ok": False, "message": "A demo run is already in progress."}
             self.pump = self.PumpSimulator(fault=fault, stops=False, warning_minutes=warning_minutes,
                                            alarm_minutes=alarm_minutes)
-            self.run = {"fault": fault, "minutes": minutes, "started": time.time(),
+            self.run = {"fault": fault, "minutes": minutes, "started": time.time(), "simulator": simulator,
                         "warning_minutes": warning_minutes, "alarm_minutes": alarm_minutes}
         return {"ok": True, "run_id": 0}
 
@@ -283,7 +285,7 @@ class MockSource:
         }
         return {"active": True, "phase": "Mock run", "fault": self.run["fault"], "minutes": self.run["minutes"],
                 "warning_minutes": self.run["warning_minutes"], "alarm_minutes": self.run["alarm_minutes"],
-                "run_url": None, "started_at": iso(started), "stop_only": False,
+                "simulator": self.run["simulator"], "run_url": None, "started_at": iso(started), "stop_only": False,
                 "streaming_started_at": iso(started + t["streaming"]) if elapsed >= t["streaming"] else None,
                 "steps": [{"key": key, "state": steps[key]} for key in STEPS]}
 
@@ -385,6 +387,7 @@ def _describe_active_run(run):
         "minutes": int(params["demo_minutes"]) if params.get("demo_minutes") else None,
         "warning_minutes": _float(params.get("warning_minutes")),
         "alarm_minutes": _float(params.get("alarm_minutes")),
+        "simulator": params.get("simulator", "on") != "off",
         "started_at": _ms_to_iso(run.start_time),
         "streaming_started_at": _ms_to_iso(stream.start_time) if stream and states.get("stream_pump_data") == "RUNNING" else None,
         "stop_only": _stop_only(run),
@@ -398,4 +401,5 @@ def _describe_finished_run(run):
     result = run.state.result_state.value if run.state and run.state.result_state else None
     params = {p.name: p.value or p.default for p in run.job_parameters or []}
     return {"run_id": run.run_id, "result": result, "ended_at": _ms_to_iso(run.end_time), "run_url": run.run_page_url,
-            "fault": params.get("fault"), "minutes": int(params["demo_minutes"]) if params.get("demo_minutes") else None}
+            "fault": params.get("fault"), "minutes": int(params["demo_minutes"]) if params.get("demo_minutes") else None,
+            "simulator": params.get("simulator", "on") != "off"}

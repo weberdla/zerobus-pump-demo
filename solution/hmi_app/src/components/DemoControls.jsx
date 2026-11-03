@@ -38,6 +38,7 @@ const STEP_LABELS = {
   stream_pump_data: "Stream pump data through Zerobus Ingest",
   stop_live_silver: "Stop the live silver pipeline",
 };
+const EXTERNAL_STREAM_LABEL = "Keep the pipeline live for the external feed";
 
 const STEP_STATES = {
   pending: ["○", "Waiting"],
@@ -53,17 +54,20 @@ export default function DemoControls({ demo, status, busy, notice, onStart, onSt
   const [fault, setFault] = useState("bearing");
   const [minutes, setMinutes] = useState(15);
   const [times, setTimes] = useState(DEFAULT_TIMES);
+  const [simulator, setSimulator] = useState(true);
   const active = demo?.active;
-  // While a demo runs, show its fault, duration, and timeline rather than the local selection.
+  // While a demo runs, show its fault, duration, timeline, and data source rather than the local selection.
   const shownFault = active && demo.fault ? demo.fault : fault;
   const shownMinutes = active && demo.minutes ? demo.minutes : minutes;
+  const shownSimulator = active && !demo.stop_only ? demo.simulator !== false : simulator;
   const typed = times[shownFault] ?? {};
   const shownTimes = active ? timeline(shownFault, demo.warning_minutes, demo.alarm_minutes) : timeline(shownFault, typed.warning, typed.alarm);
-  const problems = active ? {} : timelineProblems(fault, shownTimes, minutes);
+  const problems = active || !simulator ? {} : timelineProblems(fault, shownTimes, minutes);
+  const faultLocked = active || busy || !shownSimulator; // the fault and its timing only apply to the simulator
   const setTime = (key, value) => setTimes({ ...times, [fault]: { ...times[fault], [key]: value } });
   const timeInput = (key) => (
     <span className="time-input">
-      <input type="number" min="0.5" max="60" step="0.5" disabled={active || busy}
+      <input type="number" min="0.5" max="60" step="0.5" disabled={faultLocked}
              value={active ? shownTimes[key] : typed[key]} onChange={(e) => setTime(key, e.target.value)} />
       min
     </span>
@@ -74,10 +78,11 @@ export default function DemoControls({ demo, status, busy, notice, onStart, onSt
     <>
       <section className="panel controls">
         <div className="panel-title">Demo control</div>
+        <div className={`fault-settings ${shownSimulator ? "" : "off"}`}>
         <div className="field-label">Fault</div>
         <div className="segmented">
           {FAULTS.map(([value, label]) => (
-            <button key={value} className={shownFault === value ? "selected" : ""} disabled={active || busy} onClick={() => setFault(value)}>
+            <button key={value} className={shownFault === value ? "selected" : ""} disabled={faultLocked} onClick={() => setFault(value)}>
               {label}
             </button>
           ))}
@@ -98,6 +103,7 @@ export default function DemoControls({ demo, status, busy, notice, onStart, onSt
             {problems.error ?? problems.note ?? "Minutes after streaming starts, about 30 s after you click Start. The screen shows them about 15 s later."}
           </p>
         )}
+        </div>
         <div className="control-row">
           <label>
             Duration
@@ -108,14 +114,28 @@ export default function DemoControls({ demo, status, busy, notice, onStart, onSt
             </select>
           </label>
           <button className="start" disabled={active || busy || Boolean(problems.error)}
-                  onClick={() => onStart(fault, minutes, shownTimes.warning, fault === "bearing" ? shownTimes.alarm : null)}>
+                  onClick={() => onStart(fault, minutes, shownTimes.warning, fault === "bearing" ? shownTimes.alarm : null, simulator)}>
             ▶ Start demo
           </button>
           <button className="stop" disabled={!active || busy} onClick={onStop}>■ Stop</button>
         </div>
+        <label className="simulator-toggle">
+          <input type="checkbox" checked={!shownSimulator} disabled={active || busy} onChange={(e) => setSimulator(!e.target.checked)} />
+          Turn the simulator off
+        </label>
         <p className="muted small">
-          Start runs the <code>zerobus_pump_demo</code> job. When the stream ends, or you click Stop, the job shuts
-          down the live silver pipeline, so nothing keeps running.
+          {shownSimulator ? (
+            <>
+              Start runs the <code>zerobus_pump_demo</code> job. When the stream ends, or you click Stop, the job shuts
+              down the live silver pipeline, so nothing keeps running.
+            </>
+          ) : (
+            <>
+              For another data feed, such as Ignition, sending PUMP-101 readings to the Zerobus endpoint. The job creates
+              the bronze table and keeps the live silver pipeline going for the duration, then stops it. Start the feed
+              once the status says it's waiting; the tag reference gives the record format.
+            </>
+          )}
         </p>
       </section>
 
@@ -126,8 +146,8 @@ export default function DemoControls({ demo, status, busy, notice, onStart, onSt
           {status.headline}
           {active && demo.fault && (
             <span className="muted run-params">
-              {FAULTS.find(([value]) => value === demo.fault)?.[1] ?? demo.fault} · {demo.minutes} min
-              {demo.fault !== "none" && ` · warning ${shownTimes.warning} min · alarm ${shownTimes.alarm} min`}
+              {demo.simulator === false ? "External feed" : FAULTS.find(([value]) => value === demo.fault)?.[1] ?? demo.fault} · {demo.minutes} min
+              {demo.simulator !== false && demo.fault !== "none" && ` · warning ${shownTimes.warning} min · alarm ${shownTimes.alarm} min`}
             </span>
           )}
         </div>
@@ -145,7 +165,9 @@ export default function DemoControls({ demo, status, busy, notice, onStart, onSt
               return (
                 <li key={step.key} className={step.state}>
                   <span className="step-icon">{icon}</span>
-                  <span className="step-name">{STEP_LABELS[step.key] ?? step.key}</span>
+                  <span className="step-name">
+                    {step.key === "stream_pump_data" && demo?.simulator === false ? EXTERNAL_STREAM_LABEL : STEP_LABELS[step.key] ?? step.key}
+                  </span>
                   <span className="step-state">{label}</span>
                 </li>
               );

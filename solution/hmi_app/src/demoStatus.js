@@ -45,6 +45,7 @@ export function describeDemo(demo, { trend, tags, now, request, busy }) {
   }
 
   const steps = Object.fromEntries((demo.steps ?? []).map((s) => [s.key, s.state]));
+  const external = demo.simulator === false; // another source, such as Ignition, sends the readings
   const started = demo.started_at ? Date.parse(demo.started_at) : now;
   const elapsed = (now - started) / 1000;
   const eta = (target) => (elapsed < target ? `in about ${Math.round(target - elapsed)} s` : "any moment now");
@@ -56,11 +57,21 @@ export function describeDemo(demo, { trend, tags, now, request, busy }) {
     return {
       tone: "starting",
       headline: "Creating the bronze table",
-      detail: `Creating the table and its grants. Streaming begins ${eta(FIRST_READINGS_S)}.`,
+      detail: external
+        ? "Creating the table and its grants. Then the screen waits for your external feed."
+        : `Creating the table and its grants. Streaming begins ${eta(FIRST_READINGS_S)}.`,
       short: "Starting",
     };
   }
   const inBronze = trend.some((p) => Date.parse(p.ts) + BUCKET_MS > started);
+  if (!inBronze && external) {
+    return {
+      tone: "starting",
+      headline: "Waiting for the external feed",
+      detail: "The simulator is off. Start your feed, such as Ignition, sending PUMP-101 readings to the Zerobus endpoint; they show here when they reach bronze.",
+      short: "Waiting",
+    };
+  }
   if (!inBronze) {
     return {
       tone: "starting",
@@ -80,7 +91,7 @@ export function describeDemo(demo, { trend, tags, now, request, busy }) {
     return {
       tone: "streaming",
       headline: "Streaming into bronze",
-      detail: `Readings are landing in bronze through Zerobus Ingest. Silver goes live ${eta(SILVER_LIVE_S)}, once the pipeline is running.`,
+      detail: `${external ? "Readings from the external feed" : "Readings"} are landing in bronze through Zerobus Ingest. Silver goes live ${eta(SILVER_LIVE_S)}, once the pipeline is running.`,
       short: "Streaming",
       progress,
     };
@@ -88,16 +99,17 @@ export function describeDemo(demo, { trend, tags, now, request, busy }) {
   return {
     tone: "live",
     headline: "Live",
-    detail: "Readings flow from the simulator through Zerobus Ingest into bronze, and AUTO CDC keeps silver current.",
+    detail: `Readings flow from the ${external ? "external feed" : "simulator"} through Zerobus Ingest into bronze, and AUTO CDC keeps silver current.`,
     short: progress ? `Live · ${mmss(progress.left)}` : "Live",
     progress,
   };
 }
 
-// State of each job step for display; the stream step reads "starting" until this run's data arrives.
+// State of each job step for display; the simulator's stream step reads "starting" until this run's data
+// arrives. With an external feed, the step is just keeping the pipeline live, so it stays "running".
 export function stepStates(demo, status) {
   return (demo?.steps ?? []).map((step) => {
-    if (step.key === "stream_pump_data" && step.state === "running" && status.tone === "starting") {
+    if (step.key === "stream_pump_data" && step.state === "running" && status.tone === "starting" && demo.simulator !== false) {
       return { ...step, state: "starting" };
     }
     return step;
