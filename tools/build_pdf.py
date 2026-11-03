@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Build a print-ready PDF of the instructor demo guide (solution/README.md).
+"""Build print-ready PDFs of the instructor demo guide and the tag reference.
 
 Requires pandoc on PATH and:  pip install weasyprint beautifulsoup4 certifi
 On macOS with Homebrew's pango, prefix the command with
 DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib so WeasyPrint can find it.
 
-    python tools/build_pdf.py    # writes solution/zerobus-pump-instructor-demo.pdf
+    python tools/build_pdf.py                   # builds every document below
+    python tools/build_pdf.py tag-reference     # or just the ones you name
 """
 
 import argparse
@@ -45,6 +46,18 @@ DOCUMENTS = {
         "flow": ["Service principal", "Deploy", "Start the app", "Run the demo", "Clean up"],
         "meta": [("Setup", "About 5 minutes"), ("Demo run", "15 minutes by default"),
                  ("Databricks CLI", "1.x (validated 1.20.0)"), ("Edition", EDITION)],
+        "new_page": None,
+        "toc": False,
+    },
+    "tag-reference": {
+        "input": "solution/tag-reference.md",
+        "output": "solution/zerobus-pump-tag-reference.pdf",
+        "header": "Zerobus Ingest · Tag Reference",
+        "subtitle": "The eight tags the simulated pump streams through Zerobus Ingest: what each one measures, "
+                    "its unit, the values it can take, and its normal operating range; the alarm limits; and "
+                    "the table structure and record format for sending readings to Zerobus.",
+        "flow": ["Simulator", "Zerobus Ingest", "Bronze", "AUTO CDC", "Silver"],
+        "meta": [("Equipment", "PUMP-101"), ("Site", "PLANT-A"), ("Tags", "8, every second"), ("Edition", EDITION)],
         "new_page": None,
         "toc": False,
     },

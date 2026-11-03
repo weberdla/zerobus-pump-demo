@@ -20,6 +20,7 @@ Ingest with a simulated centrifugal pump:
 | `solution/pump_silver_pipeline.py` | The silver pipeline: bronze change feed → AUTO CDC |
 | `solution/zerobus_pump.lvdash.json` | The dashboard |
 | `solution/hmi_app/` | The plant HMI app: FastAPI backend and React UI |
+| `solution/tag-reference.md`, `solution/zerobus-pump-tag-reference.pdf` | The pump's tags (description, unit, value ranges, normal operating ranges, alarm limits), the bronze and silver table structure, and the Zerobus record format |
 | `solution/zerobus-pump-instructor-demo.pdf` | This guide as a PDF, built with `tools/build_pdf.py` |
 
 `stream_pump_data.py` runs the simulator with its scheduled stops turned off (`stops=False`), so a
@@ -238,7 +239,7 @@ Set `DATABRICKS_APP_PORT` to use a port other than 8000.
 
 ## Rebuild the PDF
 
-After you edit this guide, rebuild `solution/zerobus-pump-instructor-demo.pdf` from the project root.
+After you edit this guide or the tag reference, rebuild their PDFs from the project root.
 The script needs [pandoc](https://pandoc.org) and WeasyPrint's system libraries; on macOS, run
 `brew install pandoc pango`.
 
@@ -247,4 +248,4 @@ python3 -m venv .venv && .venv/bin/pip install weasyprint beautifulsoup4 certifi
 DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib .venv/bin/python tools/build_pdf.py
 ```
 
-The cover page's summary, steps and facts are set in `tools/build_pdf.py`, not in this guide.
+To build just one, name it: `tools/build_pdf.py tag-reference` or `tools/build_pdf.py instructor-demo`. The cover pages' summary, steps and facts are set in `tools/build_pdf.py`, not in the documents.
