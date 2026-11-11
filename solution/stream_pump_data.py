@@ -12,7 +12,9 @@
 # MAGIC
 # MAGIC With `simulator` set to `off`, another source (for example, Ignition) sends the readings. The
 # MAGIC notebook then streams nothing; it keeps the run, and so the live silver pipeline, going for the
-# MAGIC demo's duration, and reports how many readings reach bronze each minute.
+# MAGIC demo's duration, and reports how many readings reach bronze each minute. For the Ignition
+# MAGIC Zerobus Connector module it also reports the tag events landing in `ignition_table`, which the
+# MAGIC silver pipeline maps into bronze.
 
 # COMMAND ----------
 
@@ -26,6 +28,7 @@ dbutils.library.restartPython()
 
 dbutils.widgets.text("server_endpoint", "")
 dbutils.widgets.text("table_name", "")
+dbutils.widgets.text("ignition_table", "")
 dbutils.widgets.text("secret_scope", "")
 dbutils.widgets.text("duration_minutes", "15")
 dbutils.widgets.text("fault", "bearing")
@@ -40,13 +43,18 @@ import time
 duration_s = float(dbutils.widgets.get("duration_minutes")) * 60
 if dbutils.widgets.get("simulator").strip().lower() == "off":
     bronze = dbutils.widgets.get("table_name")
+    ignition = dbutils.widgets.get("ignition_table").strip()
     end = time.monotonic() + duration_s
     print(f"Simulator off: keeping the live pipeline going for {duration_s / 60:g} minutes for another data feed.")
     while time.monotonic() < end:
         time.sleep(min(60.0, end - time.monotonic()))
         # Read the table again each time, so the count includes the newest commits.
         readings = spark.table(bronze).where("event_ts >= current_timestamp() - INTERVAL 1 MINUTE").count()
-        print(f"{readings} readings reached bronze in the last minute")
+        message = f"{readings} readings reached bronze in the last minute"
+        if ignition and spark.catalog.tableExists(ignition):
+            events = spark.table(ignition).where("event_time >= current_timestamp() - INTERVAL 1 MINUTE").count()
+            message += f" ({events} Ignition tag events landed in {ignition.rsplit('.', 1)[-1]})"
+        print(message)
     dbutils.notebook.exit("simulator off")
 
 # COMMAND ----------
