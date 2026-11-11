@@ -205,6 +205,11 @@ To run the demo from Ignition:
 1. Point the module at the landing table: the workspace URL, the Zerobus endpoint from `variable-overrides.json`, the
    service principal's client ID and an OAuth secret, target table `<catalog>.zerobus_pump_demo.ignition_events_bronze`,
    and a tag pattern that selects the eight pump tags. Keep the module **disabled**.
+
+   The module's Zerobus SDK always requests its token with the `all-apis` scope, so give the OAuth secret the
+   `all-apis` scope (or no scope restriction). A secret limited to the Zerobus scope fails with
+   `403 ... Scopes 'all-apis' are not assigned to the client`, shown in the module diagnostics as
+   `Failed to get Zerobus token`.
 2. Start the demo with the simulator off and wait for **Waiting for the external feed**, as above.
 3. Enable the module. Readings reach the plant screen about 20-30 seconds after Ignition writes them: the module's batch
    flush, the mapping flow and the silver flow each add a few seconds.
