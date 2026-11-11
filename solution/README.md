@@ -196,9 +196,9 @@ write `pump_tags_bronze` directly. The demo gives it a landing table instead:
 - The live silver pipeline's **`ignition_to_bronze`** flow maps each module event into a bronze reading: `site`,
   `equipment_id` and `tag_name` come from the tag path `[provider]<site>/<equipment_id>/<tag_name>` (for example
   `[default]PLANT-A/PUMP-101/Vibration`), the unit from the [tags table](tag-reference.md#tags), and Ignition's `Good` /
-  `Bad…` quality becomes `GOOD` / `BAD`. Tags outside the eight are skipped, as are events more than 5 minutes old
-  when the pipeline starts, so a previous run's events don't replay. With the simulator on, the landing table stays empty
-  and the flow does nothing.
+  `Bad…` quality becomes `GOOD` / `BAD`. Tags outside the eight are skipped. Late events, such as the module's
+  store-and-forward replaying after a network outage, still reach bronze. With the simulator on, the landing table stays
+  empty and the flow does nothing.
 
 To run the demo from Ignition:
 
@@ -212,6 +212,11 @@ To run the demo from Ignition:
 Each tag needs a reading every second or so, like the simulator's, and all eight tags must be numeric: the module sends
 booleans with `numeric_value` 0.0, so send `Running` as 1.0 / 0.0. The streaming task also logs how many events landed in
 `ignition_events_bronze` each minute.
+
+Disable the module between runs. Events it sends while no run is going stay in the landing table, and the mapping flow
+copies them into bronze when the next run starts, as with any other feed. They never overwrite newer silver values, and
+the plant screen ignores readings from before the run, but the trend charts can show them if the previous run ended
+recently.
 
 ## 4. Run it again (already deployed)
 

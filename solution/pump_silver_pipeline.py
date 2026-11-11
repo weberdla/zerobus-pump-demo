@@ -17,10 +17,6 @@ BRONZE_TABLE = spark.conf.get("bronze_table", "main.zerobus_lab.pump_tags_bronze
 # Landing table of the Ignition Zerobus Connector module. Empty = no Ignition flow.
 IGNITION_TABLE = spark.conf.get("ignition_table", "")
 
-# Ignition rows older than this when the pipeline first reads them are skipped, so leftovers from
-# an earlier run don't replay into bronze when the pipeline starts.
-IGNITION_MAX_AGE_MINUTES = int(spark.conf.get("ignition_max_age_minutes", "5"))
-
 # tag_name -> unit, as in the tag reference (and pump_simulator.TAGS). Ignition tags outside this
 # list are not mapped: the plant screen only knows these eight.
 PUMP_TAG_UNITS = {
@@ -51,9 +47,11 @@ if IGNITION_TABLE:
         quality = (F.when(quality.startswith("GOOD"), "GOOD")
                    .when(quality.startswith("BAD") | quality.startswith("ERROR"), "BAD")
                    .otherwise("UNCERTAIN"))
+        # No age filter: late events (e.g. the module's store-and-forward replaying after an outage)
+        # still reach bronze. Events sent between runs land in the next run, as with any other feed;
+        # silver keeps each tag's newest reading, so they never overwrite current values.
         return (
             spark.readStream.table(IGNITION_TABLE)
-            .where(F.col("event_time") >= F.expr(f"current_timestamp() - INTERVAL {IGNITION_MAX_AGE_MINUTES} MINUTES"))
             .select(
                 F.regexp_extract("tag_path", IGNITION_TAG_PATH, 2).alias("equipment_id"),
                 F.regexp_extract("tag_path", IGNITION_TAG_PATH, 1).alias("site"),
