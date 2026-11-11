@@ -59,6 +59,7 @@ resources:
             base_parameters:
               server_endpoint: ${var.zerobus_endpoint}
               table_name: ${var.catalog}.${resources.schemas.zerobus_pump_schema.name}.pump_tags_bronze
+              ignition_table: ${var.catalog}.${resources.schemas.zerobus_pump_schema.name}.ignition_events_bronze
               secret_scope: ${var.secret_scope}
               duration_minutes: "{{job.parameters.demo_minutes}}"
               fault: "{{job.parameters.fault}}"

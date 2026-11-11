@@ -31,7 +31,7 @@ fault develops without interruption. With stops on, the pump stops for 30-60 sec
 | Resource | Name | Purpose |
 |----------|------|---------|
 | Schema | `<catalog>.zerobus_pump_demo` | Holds the bronze and silver tables |
-| Pipeline | `zerobus_pump_silver` | Bronze Change Data Feed → AUTO CDC → `pump_tags_current`, one row per tag |
+| Pipeline | `zerobus_pump_silver` | Bronze Change Data Feed → AUTO CDC → `pump_tags_current`, one row per tag. Also maps Ignition Zerobus Connector events from `ignition_events_bronze` into bronze |
 | Job | `zerobus_pump_silver_live` | Runs the pipeline continuously. **Deployed paused**; only the demo job turns it on |
 | Job | `zerobus_pump_demo` | The demo: creates bronze and grants, starts the live pipeline, streams pump data, stops the pipeline |
 | Dashboard | `Zerobus Pump Live Demo` | KPIs, pump health, silver lag, 30-minute trends, current state per tag |
@@ -184,6 +184,34 @@ The plant screen and the dashboard then work as they do with the simulator. The 
 
 - **The job** keeps the live pipeline going for the duration, then stops it, as with the simulator. Its streaming task logs how many readings reached bronze each minute.
 - **After the run**, readings your feed sends still land in bronze, but silver only picks them up in the next run. The plant screen shows only readings sent during the current run.
+
+#### Ignition with the Zerobus Connector module
+
+The [Zerobus Connector](https://github.com/pravinva/lakeflow-ignition-zerobus-connector) Ignition module streams tag changes
+through Zerobus Ingest, but always in its own record format (`tag_path`, `numeric_value`, `event_time`, …), so it can't
+write `pump_tags_bronze` directly. The demo gives it a landing table instead:
+
+- The demo job's first task also creates **`<catalog>.zerobus_pump_demo.ignition_events_bronze`** in the module's format and
+  grants the Zerobus service principal `MODIFY` and `SELECT` on it.
+- The live silver pipeline's **`ignition_to_bronze`** flow maps each module event into a bronze reading: `site`,
+  `equipment_id` and `tag_name` come from the tag path `[provider]<site>/<equipment_id>/<tag_name>` (for example
+  `[default]PLANT-A/PUMP-101/Vibration`), the unit from the [tags table](tag-reference.md#tags), and Ignition's `Good` /
+  `Bad…` quality becomes `GOOD` / `BAD`. Tags outside the eight are skipped, as are events more than 5 minutes old
+  when the pipeline starts, so a previous run's events don't replay. With the simulator on, the landing table stays empty
+  and the flow does nothing.
+
+To run the demo from Ignition:
+
+1. Point the module at the landing table: the workspace URL, the Zerobus endpoint from `variable-overrides.json`, the
+   service principal's client ID and an OAuth secret, target table `<catalog>.zerobus_pump_demo.ignition_events_bronze`,
+   and a tag pattern that selects the eight pump tags. Keep the module **disabled**.
+2. Start the demo with the simulator off and wait for **Waiting for the external feed**, as above.
+3. Enable the module. Readings reach the plant screen about 20-30 seconds after Ignition writes them: the module's batch
+   flush, the mapping flow and the silver flow each add a few seconds.
+
+Each tag needs a reading every second or so, like the simulator's, and all eight tags must be numeric: the module sends
+booleans with `numeric_value` 0.0, so send `Running` as 1.0 / 0.0. The streaming task also logs how many events landed in
+`ignition_events_bronze` each minute.
 
 ## 4. Run it again (already deployed)
 

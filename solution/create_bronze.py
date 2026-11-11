@@ -4,7 +4,11 @@
 # MAGIC
 # MAGIC Creates the bronze table with Change Data Feed on, gives the Zerobus service principal
 # MAGIC write access to it, and gives the HMI app's service principal read access to the schema.
-# MAGIC Safe to re-run.
+# MAGIC
+# MAGIC Also creates `ignition_events_bronze`, the landing table for the Ignition Zerobus Connector
+# MAGIC module. The module writes its own fixed record format, so the silver pipeline maps those rows
+# MAGIC into `pump_tags_bronze` (see `pump_silver_pipeline.py`). The table stays empty when the
+# MAGIC simulator feeds the demo. Safe to re-run.
 
 # COMMAND ----------
 
@@ -18,6 +22,7 @@ schema = dbutils.widgets.get("schema")
 sp = dbutils.widgets.get("sp_application_id")
 app_name = dbutils.widgets.get("app_name")
 bronze = f"`{catalog}`.`{schema}`.pump_tags_bronze"
+ignition = f"`{catalog}`.`{schema}`.ignition_events_bronze"
 
 # COMMAND ----------
 
@@ -37,10 +42,41 @@ TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
 
 # COMMAND ----------
 
+# Landing table for the Ignition Zerobus Connector module (github.com/pravinva/lakeflow-ignition-zerobus-connector).
+# Columns, types and order must match the module's OTEvent protobuf record (ot_event.proto); the
+# module fills all 18 fields, so Zerobus rejects the stream if a column is missing.
+spark.sql(f"""
+CREATE TABLE IF NOT EXISTS {ignition} (
+  event_id            STRING    COMMENT 'Unique event ID set by the module',
+  event_time          TIMESTAMP COMMENT 'Tag value timestamp at the gateway (UTC)',
+  tag_path            STRING    COMMENT 'Full Ignition tag path, e.g. [default]PLANT-A/PUMP-101/Vibration',
+  tag_provider        STRING    COMMENT 'Ignition tag provider, e.g. default',
+  numeric_value       DOUBLE    COMMENT 'Value of a numeric tag (0.0 for other types)',
+  string_value        STRING    COMMENT 'Value of a string tag',
+  boolean_value       BOOLEAN   COMMENT 'Value of a boolean tag',
+  quality             STRING    COMMENT 'Ignition quality, e.g. Good',
+  quality_code        INT       COMMENT '192 when the quality is good, else 0',
+  source_system       STRING    COMMENT 'Source System ID set in the module',
+  ingestion_timestamp BIGINT    COMMENT 'When the module captured the event (microseconds since the epoch)',
+  data_type           STRING    COMMENT 'DOUBLE, STRING or BOOLEAN',
+  alarm_state         STRING,
+  alarm_priority      INT,
+  sdt_compressed      BOOLEAN   COMMENT 'Emitted through swinging-door compression',
+  compression_ratio   DOUBLE    COMMENT 'Swinging-door suppression percentage (0-100)',
+  sdt_enabled         BOOLEAN,
+  batch_bytes_sent    BIGINT
+)
+COMMENT 'Landing: raw tag events from the Ignition Zerobus Connector module, mapped into pump_tags_bronze by the silver pipeline'
+TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
+""")
+
+# COMMAND ----------
+
 for statement in (
     f"GRANT USE CATALOG ON CATALOG `{catalog}` TO `{sp}`",
     f"GRANT USE SCHEMA ON SCHEMA `{catalog}`.`{schema}` TO `{sp}`",
     f"GRANT MODIFY, SELECT ON TABLE {bronze} TO `{sp}`",
+    f"GRANT MODIFY, SELECT ON TABLE {ignition} TO `{sp}`",
 ):
     spark.sql(statement)
     print(statement)

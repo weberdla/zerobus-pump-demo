@@ -11,3 +11,5 @@ resources:
             path: ../solution/pump_silver_pipeline.py
       configuration:
         bronze_table: ${var.catalog}.${resources.schemas.zerobus_pump_schema.name}.pump_tags_bronze
+        # Landing table of the Ignition Zerobus Connector module; the pipeline maps its rows into bronze.
+        ignition_table: ${var.catalog}.${resources.schemas.zerobus_pump_schema.name}.ignition_events_bronze

@@ -151,6 +151,18 @@ show them:
 
   Revoke your own principal's grants when you're done; the cleanup script only handles the demo's.
 
+- **From the Ignition Zerobus Connector module:** send to `<catalog>.zerobus_pump_demo.ignition_events_bronze` instead.
+  The silver pipeline maps the module's records into bronze; see
+  [Ignition with the Zerobus Connector module](README.md#ignition-with-the-zerobus-connector-module).
+
+  | Module field | Bronze column |
+  |--------------|---------------|
+  | `tag_path` `[provider]<site>/<equipment_id>/<tag_name>` | `site`, `equipment_id`, `tag_name` |
+  | `numeric_value` (`boolean_value` for boolean tags) | `value`, rounded to three decimal places; `null` when the quality is bad |
+  | — | `unit`, from the tags table |
+  | `quality` (`Good`, `Bad_…`, `Uncertain_…`) | `quality`: `GOOD`, `BAD` or `UNCERTAIN` |
+  | `event_time` | `event_ts` |
+
 ### Silver table: `pump_tags_current`
 
 The silver pipeline keeps one row per tag, the latest reading, with AUTO CDC (SCD Type 1). It has the
