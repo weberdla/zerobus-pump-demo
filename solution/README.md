@@ -7,6 +7,8 @@ Ingest with a simulated centrifugal pump:
 - a silver current-state table maintained by AUTO CDC;
 - a dashboard, and a plant-style operator screen built as a Databricks App.
 
+![The plant-style operator screen during a bearing fault, at WARNING](images/hmi-bearing-warning.jpg)
+
 ## What's in this project
 
 | Path | What it is |
