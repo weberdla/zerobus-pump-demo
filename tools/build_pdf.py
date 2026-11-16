@@ -14,8 +14,10 @@ import datetime
 import html
 import os
 import pathlib
+import posixpath
 import re
 import subprocess
+import urllib.parse
 
 import certifi
 from bs4 import BeautifulSoup
@@ -33,6 +35,9 @@ LONG_BLOCK_LINES = 40  # longer code blocks may split across pages
 LANG_LABELS = {"bash": "bash", "powershell": "PowerShell", "python": "Python", "sql": "SQL", "json": "JSON"}
 BOX_DRAWING = set("─│┬┴┼└┘┐├┤")
 EDITION = datetime.date.today().strftime("%B %Y")
+# Relative links, such as one document's link to the other, point here in the PDFs. Left
+# relative, WeasyPrint would turn them into file:// paths on the machine that built the PDF.
+REPO_BLOB_URL = "https://github.com/weberdla/zerobus-pump-demo/blob/main"
 
 # new_page: regex for top-level section ids that start on a new page; the rest flow on.
 DOCUMENTS = {
@@ -143,6 +148,18 @@ def transform(soup, doc):
             eyebrow.string = f"Step {step.group(1)}"
             h2.append(eyebrow)
             h2.append(step.group(2))
+
+    source_dir = posixpath.dirname(doc["input"])
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if href.startswith("#") or urllib.parse.urlsplit(href).scheme:
+            continue
+        path, _, fragment = href.partition("#")
+        target = posixpath.normpath(posixpath.join(source_dir, path))
+        if target == doc["input"] and fragment:
+            a["href"] = f"#{fragment}"
+        else:
+            a["href"] = f"{REPO_BLOB_URL}/{target}" + (f"#{fragment}" if fragment else "")
 
     # Pandoc adds an empty per-line anchor to every highlighted code line.
     for anchor in soup.select('pre code span[id] > a[href^="#cb"]'):
