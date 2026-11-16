@@ -7,5 +7,5 @@ __pycache__/
 .isaac/
 node_modules/
 solution/hmi_app/dist/
-# Generated through an internal npm mirror; the Apps build resolves package.json from the public registry.
+# Not committed: a lock file made locally can point at a private registry. The Apps build resolves package.json from the public npm registry.
 solution/hmi_app/package-lock.json
