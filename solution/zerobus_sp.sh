@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create or remove the Zerobus service principal used by the instructor demo bundle.
+# Create or remove the Zerobus service principal used by the demo bundle.
 #
 #   solution/zerobus_sp.sh setup   -p <cli-profile> [-c <catalog>] [-s <secret-scope>]
 #   solution/zerobus_sp.sh cleanup -p <cli-profile> [-c <catalog>] [-s <secret-scope>] [-a <app-name>]

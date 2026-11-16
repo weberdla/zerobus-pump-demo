@@ -1,4 +1,4 @@
-# Instructor demo: live pump telemetry with Zerobus Ingest
+# Demo: live pump telemetry with Zerobus Ingest
 
 This project is a **Databricks Asset Bundle** that deploys a live, self-stopping demo of Zerobus
 Ingest with a simulated centrifugal pump:
@@ -20,8 +20,8 @@ Ingest with a simulated centrifugal pump:
 | `solution/pump_silver_pipeline.py` | The silver pipeline: bronze change feed → AUTO CDC |
 | `solution/zerobus_pump.lvdash.json` | The dashboard |
 | `solution/hmi_app/` | The plant HMI app: FastAPI backend and React UI |
-| `solution/tag-reference.md`, `solution/zerobus-pump-tag-reference.pdf` | The pump's tags (description, unit, value ranges, normal operating ranges, alarm limits), the bronze and silver table structure, and the Zerobus record format |
-| `solution/zerobus-pump-instructor-demo.pdf` | This guide as a PDF, built with `tools/build_pdf.py` |
+| `solution/tag-reference.md`, `solution/tag-reference.pdf` | The pump's tags (description, unit, value ranges, normal operating ranges, alarm limits), the bronze and silver table structure, and the Zerobus record format |
+| `solution/README.pdf` | This guide as a PDF, built with `tools/build_pdf.py` |
 
 `stream_pump_data.py` runs the simulator with its scheduled stops turned off (`stops=False`), so a
 fault develops without interruption. With stops on, the pump stops for 30-60 seconds every 5-10 minutes.
@@ -304,4 +304,4 @@ python3 -m venv .venv && .venv/bin/pip install weasyprint beautifulsoup4 certifi
 DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib .venv/bin/python tools/build_pdf.py
 ```
 
-To build just one, name it: `tools/build_pdf.py tag-reference` or `tools/build_pdf.py instructor-demo`. The cover pages' summary, steps and facts are set in `tools/build_pdf.py`, not in the documents.
+To build just one, name it: `tools/build_pdf.py tag-reference` or `tools/build_pdf.py README`. The cover pages' summary, steps and facts are set in `tools/build_pdf.py`, not in the documents.
