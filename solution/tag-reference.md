@@ -39,7 +39,7 @@ limits.
 | `SuctionPressure` | < 0.8 bar | < 0.5 bar | Cavitation; only checked while the pump runs |
 
 When a run starts, you choose when the fault raises its first WARNING and ALARM. See step 3,
-[Run the demo](README.md#3-run-the-demo), in the instructor guide.
+[Run the demo](README.md#3-run-the-demo), in the demo guide.
 
 ## How the faults move the tags
 
@@ -125,7 +125,7 @@ and timestamp as the reading it repeats.
 
 ### Sending readings from another source
 
-With the simulator off (see [Use another data feed](README.md#use-another-data-feed) in the instructor
+With the simulator off (see [Use another data feed](README.md#use-another-data-feed) in the demo
 guide), another source such as Ignition sends the readings. For the plant screen and the dashboard to
 show them:
 

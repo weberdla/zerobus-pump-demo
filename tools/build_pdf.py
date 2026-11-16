@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build print-ready PDFs of the instructor demo guide and the tag reference.
+"""Build print-ready PDFs of the demo guide (README) and the tag reference.
 
 Requires pandoc on PATH and:  pip install weasyprint beautifulsoup4 certifi
 On macOS with Homebrew's pango, prefix the command with
@@ -36,10 +36,10 @@ EDITION = datetime.date.today().strftime("%B %Y")
 
 # new_page: regex for top-level section ids that start on a new page; the rest flow on.
 DOCUMENTS = {
-    "instructor-demo": {
+    "README": {
         "input": "solution/README.md",
-        "output": "solution/zerobus-pump-instructor-demo.pdf",
-        "header": "Zerobus Ingest · Instructor Demo",
+        "output": "solution/README.pdf",
+        "header": "Zerobus Ingest · Demo",
         "subtitle": "Deploy a Databricks Asset Bundle and run a live, self-stopping "
                     "demo: pump telemetry streaming through Zerobus Ingest into bronze, a continuously updated "
                     "silver table, a dashboard, and a plant-style operator screen that starts and stops the demo.",
@@ -51,7 +51,7 @@ DOCUMENTS = {
     },
     "tag-reference": {
         "input": "solution/tag-reference.md",
-        "output": "solution/zerobus-pump-tag-reference.pdf",
+        "output": "solution/tag-reference.pdf",
         "header": "Zerobus Ingest · Tag Reference",
         "subtitle": "The eight tags the simulated pump streams through Zerobus Ingest: what each one measures, "
                     "its unit, the values it can take, and its normal operating range; the alarm limits; and "
