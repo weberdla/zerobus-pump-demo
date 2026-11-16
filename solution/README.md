@@ -305,3 +305,5 @@ DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib .venv/bin/python tools/build_pdf.py
 ```
 
 To build just one, name it: `tools/build_pdf.py tag-reference` or `tools/build_pdf.py README`. The cover pages' summary, steps and facts are set in `tools/build_pdf.py`, not in the documents.
+
+Building this guide also copies it to `README.md` in the project root, where GitHub shows it, with its relative links adjusted. Edit `solution/README.md`, not the copy.

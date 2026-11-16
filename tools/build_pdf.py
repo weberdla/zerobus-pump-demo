@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Build print-ready PDFs of the demo guide (README) and the tag reference.
 
+Building the guide also copies it to README.md in the repo root, where GitHub shows it.
+
 Requires pandoc on PATH and:  pip install weasyprint beautifulsoup4 certifi
 On macOS with Homebrew's pango, prefix the command with
 DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib so WeasyPrint can find it.
@@ -31,6 +33,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 CSS = pathlib.Path(__file__).resolve().parent / "pdf.css"
 
 STEP_HEADING = re.compile(r"^(\d+)\. (.+)$")
+# A Markdown link or image target that is a relative path: not an anchor, URL, or absolute path.
+RELATIVE_MD_LINK = re.compile(r"(\]\()(?!#|[A-Za-z][A-Za-z0-9+.-]*:|/)([^)\s]+)")
 LONG_BLOCK_LINES = 40  # longer code blocks may split across pages
 LANG_LABELS = {"bash": "bash", "powershell": "PowerShell", "python": "Python", "sql": "SQL", "json": "JSON"}
 BOX_DRAWING = set("─│┬┴┼└┘┐├┤")
@@ -44,6 +48,7 @@ DOCUMENTS = {
     "README": {
         "input": "solution/README.md",
         "output": "solution/README.pdf",
+        "copy_to": "README.md",  # a copy GitHub shows on the repo's front page
         "header": "Zerobus Ingest · Demo",
         "subtitle": "Deploy a Databricks Asset Bundle and run a live, self-stopping "
                     "demo: pump telemetry streaming through Zerobus Ingest into bronze, a continuously updated "
@@ -236,6 +241,22 @@ def build(doc):
     # Resolve relative image paths from the markdown file's own folder.
     HTML(string=document, base_url=str((ROOT / doc["input"]).parent)).write_pdf(output, stylesheets=[str(CSS)])
     print(output)
+    if doc.get("copy_to"):
+        write_copy(doc)
+
+
+def write_copy(doc):
+    """Copy the Markdown to doc["copy_to"], rewriting its relative links to work from there."""
+    source, copy = doc["input"], doc["copy_to"]
+    prefix = posixpath.relpath(posixpath.dirname(source), posixpath.dirname(copy) or ".")
+    text = RELATIVE_MD_LINK.sub(
+        lambda m: m.group(1) + posixpath.normpath(posixpath.join(prefix, m.group(2))),
+        (ROOT / source).read_text(),
+    )
+    note = (f"<!-- Copy of {source}, written by tools/build_pdf.py with its relative links "
+            f"adjusted. Edit {source}, not this file. -->\n\n")
+    (ROOT / copy).write_text(note + text)
+    print(ROOT / copy)
 
 
 def main():
